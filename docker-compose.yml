@@ -1,0 +1,17 @@
+services:
+  syncthing:
+    image: syncthing/syncthing:latest
+    container_name: syncthing
+    hostname: don-quixote
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+    volumes:
+      - ./config:/var/syncthing/config
+      - ~/agent-share:/var/syncthing/agent-share
+    ports:
+      - "127.0.0.1:8384:8384"   # Web UI — localhost only (SSH tunnel)
+      - "22000:22000/tcp"        # Syncthing protocol
+      - "22000:22000/udp"        # Syncthing protocol
+      - "21027:21027/udp"        # Local discovery

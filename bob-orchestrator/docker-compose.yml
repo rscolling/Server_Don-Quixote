@@ -1,0 +1,40 @@
+services:
+  bob:
+    build: .
+    container_name: atg-bob
+    restart: unless-stopped
+    ports:
+      - "8100:8100"
+    env_file:
+      - .env
+    volumes:
+      - ./bob_context:/app/bob_context:ro
+      - bob_data:/app/data
+      - ./token.json:/app/gmail_token.json
+      - ./credentials.json:/app/gmail_credentials.json:ro
+    networks:
+      - agent-net
+    depends_on:
+      - chromadb
+
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: chromadb
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+      - ANONYMIZED_TELEMETRY=FALSE
+    networks:
+      - agent-net
+
+volumes:
+  bob_data:
+  chroma_data:
+
+networks:
+  agent-net:
+    external: true

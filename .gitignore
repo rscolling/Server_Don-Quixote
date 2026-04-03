@@ -1,0 +1,25 @@
+# Secrets
+.env
+*.env
+
+# Data
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# QR / device identity
+server-device-id-qr.png
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Docker volumes
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

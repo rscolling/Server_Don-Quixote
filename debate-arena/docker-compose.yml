@@ -1,0 +1,60 @@
+services:
+  pm:
+    build:
+      context: ./agents/pm
+    container_name: atg-pm
+    env_file: .env
+    environment:
+      - PORT=8101
+    volumes:
+      - ~/agent-share:/agent-share
+      - ./common:/common:ro
+    networks:
+      - agent-net
+    restart: unless-stopped
+
+  researcher:
+    build:
+      context: ./agents/researcher
+    container_name: atg-researcher
+    env_file: .env
+    environment:
+      - PORT=8102
+    volumes:
+      - ~/agent-share:/agent-share
+      - ./common:/common:ro
+    networks:
+      - agent-net
+    restart: unless-stopped
+
+  copy-editor:
+    build:
+      context: ./agents/copy-editor
+    container_name: atg-copy-editor
+    env_file: .env
+    environment:
+      - PORT=8103
+    volumes:
+      - ~/agent-share:/agent-share
+      - ./common:/common:ro
+    networks:
+      - agent-net
+    restart: unless-stopped
+
+  qa:
+    build:
+      context: ./agents/qa
+    container_name: atg-qa
+    env_file: .env
+    environment:
+      - PORT=8104
+    volumes:
+      - ~/agent-share:/agent-share
+      - ./common:/common:ro
+    networks:
+      - agent-net
+    restart: unless-stopped
+
+networks:
+  agent-net:
+    external: true

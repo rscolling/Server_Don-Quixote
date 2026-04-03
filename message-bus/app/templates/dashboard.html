@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0f1117">
+<title>Message Bus — don-quixote</title>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<style>
+  :root {
+    --bg-primary: #0f1117;
+    --bg-surface: #1a1d27;
+    --bg-elevated: #12141c;
+    --border: #2a2d37;
+    --border-subtle: #1f222e;
+    --text-primary: #e0e0e0;
+    --text-secondary: #888;
+    --text-muted: #555;
+    --accent: #3b82f6;
+    --accent-hover: #2563eb;
+    --success: #4ade80;
+    --error: #f87171;
+    --warning: #fb923c;
+    --info: #60a5fa;
+    --purple: #a78bfa;
+    --teal: #5eead4;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; }
+
+  .header { background: var(--bg-surface); padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+  .header h1 { font-size: 18px; font-weight: 600; }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .ws-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .ws-connected { background: var(--success); }
+  .ws-disconnected { background: var(--error); animation: pulse 1.5s infinite; }
+  @keyframes pulse { 50% { opacity: 0.4; } }
+
+  .container { max-width: 1200px; margin: 0 auto; padding: 16px; }
+
+  .card { background: var(--bg-surface); border-radius: 8px; border: 1px solid var(--border); overflow: hidden; }
+  .card-header { padding: 12px 16px; border-bottom: 1px solid var(--border); font-weight: 600; font-size: 14px; display: flex; justify-content: space-between; align-items: center; }
+  .card-body { padding: 12px 16px; max-height: 500px; overflow-y: auto; }
+
+  .search-input { background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text-primary);
+                  padding: 6px 10px; border-radius: 6px; font-size: 12px; width: 100%; margin-bottom: 8px; }
+  .search-input::placeholder { color: var(--text-muted); }
+
+  .msg-item { padding: 8px 0; border-bottom: 1px solid var(--border-subtle); font-size: 13px; }
+  .msg-item:last-child { border-bottom: none; }
+  .msg-meta { display: flex; gap: 8px; align-items: center; margin-bottom: 4px; flex-wrap: wrap; }
+  .msg-time { color: var(--text-secondary); font-size: 11px; }
+  .msg-payload { color: #aaa; font-size: 12px; word-break: break-all; }
+  .msg-thread { color: var(--info); font-size: 11px; cursor: pointer; }
+  .msg-thread:hover { text-decoration: underline; }
+
+  .badge { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+  .badge-low { background: #1e3a5f; color: var(--info); }
+  .badge-normal { background: #1e3a2a; color: var(--success); }
+  .badge-high { background: #5f3a1e; color: var(--warning); }
+  .badge-critical { background: #5f1e1e; color: var(--error); }
+  .badge-type { background: var(--border); color: #c0c0c0; }
+  .badge-topic { background: #2d1e5f; color: var(--purple); }
+  .badge-cap { background: #1e3a3a; color: var(--teal); font-size: 10px; padding: 1px 6px; }
+
+  .agent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; }
+  .agent-card { background: var(--bg-elevated); border-radius: 6px; padding: 10px; text-align: center; border: 1px solid var(--border); }
+  .agent-card .shorthand { font-weight: 700; font-size: 16px; margin-bottom: 4px; }
+  .agent-card .name { font-size: 11px; color: var(--text-secondary); }
+  .agent-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px; vertical-align: middle; }
+  .agent-active { background: var(--success); }
+  .agent-inactive { background: var(--text-muted); }
+  .caps-list { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; margin-top: 6px; }
+
+  .task-columns { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; }
+  .task-col { min-width: 150px; flex: 1; }
+  .task-col-header { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 6px; text-align: center; }
+  .task-col.drag-over { background: rgba(59,130,246,0.08); border-radius: 6px; }
+  .task-card { background: var(--bg-elevated); border-radius: 6px; padding: 8px; margin-bottom: 6px; border: 1px solid var(--border); font-size: 12px; cursor: grab; user-select: none; }
+  .task-card:active { cursor: grabbing; }
+  .task-card.dragging { opacity: 0.4; }
+  .task-card .title { font-weight: 600; margin-bottom: 4px; }
+  .task-card .assignee { color: var(--text-secondary); font-size: 11px; }
+  .task-card .watchers { color: #666; font-size: 10px; margin-top: 4px; }
+  .task-progress { height: 2px; border-radius: 1px; background: var(--accent); margin-bottom: 6px; transition: width 0.3s; }
+
+  .form-row { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .form-row select, .form-row input { background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text-primary); padding: 8px; border-radius: 6px; font-size: 13px; flex: 1; min-width: 120px; }
+  .form-row textarea { background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text-primary); padding: 8px; border-radius: 6px; font-size: 13px; width: 100%; height: 60px; resize: vertical; font-family: monospace; }
+  .btn { background: var(--accent); color: white; border: none; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; }
+  .btn:hover { background: var(--accent-hover); }
+  .btn:disabled { background: var(--text-muted); cursor: not-allowed; }
+  .status-msg { font-size: 12px; margin-top: 4px; }
+  .status-ok { color: var(--success); }
+  .status-err { color: var(--error); }
+
+  .stats-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+  .stat-box { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; text-align: center; flex: 1; min-width: 80px; }
+  .stat-num { font-size: 24px; font-weight: 700; color: var(--accent); }
+  .stat-label { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+
+  .tab-bar { display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap; }
+  .tab { padding: 8px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; background: var(--bg-surface); border: 1px solid var(--border); position: relative; }
+  .tab.active { background: var(--accent); border-color: var(--accent); color: white; }
+  .tab-badge { position: absolute; top: -5px; right: -5px; background: var(--error); color: white;
+               font-size: 9px; font-weight: 700; border-radius: 50%; min-width: 16px; height: 16px;
+               display: flex; align-items: center; justify-content: center; }
+  .tab-key { font-size: 10px; color: var(--text-muted); margin-left: 4px; }
+  .tab.active .tab-key { color: rgba(255,255,255,0.5); }
+
+  .sub-list { font-size: 12px; }
+  .sub-item { padding: 6px 0; border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center; }
+  .sub-item:last-child { border-bottom: none; }
+
+  .thread-view { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 6px; padding: 12px; margin-top: 8px; }
+  .thread-view .msg-item { padding: 6px 0; }
+  .thread-close { cursor: pointer; color: var(--text-secondary); font-size: 11px; float: right; }
+  .thread-close:hover { color: var(--text-primary); }
+
+  /* Toast notifications */
+  .toast-container { position: fixed; top: 16px; right: 16px; z-index: 1000; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+  .toast { background: var(--bg-surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px;
+           padding: 10px 16px; font-size: 12px; color: var(--text-primary); max-width: 320px;
+           animation: slideIn 0.3s ease-out, fadeOut 0.3s ease-in 3s forwards; }
+  .toast-message { border-left-color: var(--info); }
+  .toast-task { border-left-color: var(--success); }
+  .toast-agent { border-left-color: var(--purple); }
+  @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; transform: translateY(-10px); } }
+
+  /* Shortcut help */
+  .shortcut-help { position: fixed; bottom: 16px; right: 16px; background: var(--bg-surface); border: 1px solid var(--border);
+                   border-radius: 8px; padding: 12px 16px; font-size: 11px; z-index: 100; display: none; }
+  .shortcut-help.visible { display: block; }
+  .shortcut-help kbd { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 3px; padding: 1px 5px; font-family: monospace; font-size: 10px; }
+  .shortcut-row { display: flex; justify-content: space-between; gap: 16px; padding: 2px 0; }
+
+  @media (max-width: 480px) {
+    .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .stat-num { font-size: 18px; }
+    .tab-bar { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
+    .tab { white-space: nowrap; flex-shrink: 0; }
+    .tab-key { display: none; }
+    .form-row { flex-direction: column; }
+    .form-row select, .form-row input { min-width: 100%; }
+  }
+</style>
+</head>
+<body x-data="dashboard()" x-init="init()" @keydown.window="handleKey($event)">
+
+<!-- Toast container -->
+<div class="toast-container">
+  <template x-for="(t, i) in toasts" :key="t.id">
+    <div class="toast" :class="'toast-' + t.type" @animationend="if ($event.animationName === 'fadeOut') removeToast(t.id)">
+      <span x-text="t.text"></span>
+    </div>
+  </template>
+</div>
+
+<!-- Shortcut help -->
+<div class="shortcut-help" :class="showHelp && 'visible'">
+  <div style="font-weight:600;margin-bottom:6px;">Keyboard Shortcuts</div>
+  <div class="shortcut-row"><span>Messages</span><kbd>1</kbd></div>
+  <div class="shortcut-row"><span>Tasks</span><kbd>2</kbd></div>
+  <div class="shortcut-row"><span>Agents</span><kbd>3</kbd></div>
+  <div class="shortcut-row"><span>Topics</span><kbd>4</kbd></div>
+  <div class="shortcut-row"><span>Send</span><kbd>5</kbd></div>
+  <div class="shortcut-row"><span>Focus search</span><kbd>/</kbd></div>
+  <div class="shortcut-row"><span>Refresh</span><kbd>r</kbd></div>
+  <div class="shortcut-row"><span>Toggle help</span><kbd>?</kbd></div>
+</div>
+
+<div class="header">
+  <div style="display:flex;align-items:center;gap:8px;">
+    <span class="ws-dot" :class="wsConnected ? 'ws-connected' : 'ws-disconnected'"></span>
+    <h1>Message Bus</h1>
+    <span style="font-size:11px;color:var(--text-muted);">v2.0</span>
+  </div>
+  <div class="header-right">
+    <span style="font-size:12px;color:var(--text-secondary);" x-text="'Uptime: ' + uptimeStr"></span>
+    <span style="font-size:11px;color:var(--text-muted);cursor:pointer;" @click="showHelp = !showHelp" title="Keyboard shortcuts">?</span>
+  </div>
+</div>
+
+<div class="container">
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-box">
+      <div class="stat-num" x-text="stats.messages?.total || 0"></div>
+      <div class="stat-label">Messages</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num" x-text="stats.tasks?.total || 0"></div>
+      <div class="stat-label">Tasks</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num" x-text="stats.agents?.total || 0"></div>
+      <div class="stat-label">Agents</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num" x-text="stats.agents?.active || 0"></div>
+      <div class="stat-label">Active</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num" x-text="stats.subscriptions?.topics || 0"></div>
+      <div class="stat-label">Topics</div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tab-bar">
+    <div class="tab" :class="tab === 'messages' && 'active'" @click="switchTab('messages')">
+      Messages<span class="tab-key">1</span>
+      <template x-if="unread.messages > 0 && tab !== 'messages'">
+        <span class="tab-badge" x-text="unread.messages"></span>
+      </template>
+    </div>
+    <div class="tab" :class="tab === 'tasks' && 'active'" @click="switchTab('tasks')">
+      Tasks<span class="tab-key">2</span>
+      <template x-if="unread.tasks > 0 && tab !== 'tasks'">
+        <span class="tab-badge" x-text="unread.tasks"></span>
+      </template>
+    </div>
+    <div class="tab" :class="tab === 'agents' && 'active'" @click="switchTab('agents')">
+      Agents<span class="tab-key">3</span>
+    </div>
+    <div class="tab" :class="tab === 'topics' && 'active'" @click="switchTab('topics')">
+      Topics<span class="tab-key">4</span>
+    </div>
+    <div class="tab" :class="tab === 'send' && 'active'" @click="switchTab('send')">
+      Send<span class="tab-key">5</span>
+    </div>
+  </div>
+
+  <!-- Messages Tab -->
+  <div x-show="tab === 'messages'">
+    <div class="card">
+      <div class="card-header">
+        <span>Recent Messages</span>
+        <span style="font-size:11px;color:var(--text-secondary);" x-text="wsConnected ? 'Live' : 'Disconnected'"></span>
+      </div>
+      <div class="card-body">
+        <input type="text" class="search-input" x-model="messageFilter" placeholder="Filter messages... (sender, recipient, topic, type)" x-ref="msgSearch" />
+        <template x-if="filteredMessages.length === 0">
+          <p style="color:var(--text-muted);font-size:13px;padding:20px 0;text-align:center;" x-text="messages.length === 0 ? 'No messages yet' : 'No matches'"></p>
+        </template>
+        <template x-for="msg in filteredMessages" :key="msg.id">
+          <div class="msg-item">
+            <div class="msg-meta">
+              <span class="badge badge-type" x-text="msg.message_type"></span>
+              <span class="badge" :class="'badge-' + msg.priority" x-text="msg.priority"></span>
+              <strong x-text="msg.sender"></strong>
+              <span style="color:var(--text-muted);">&#8594;</span>
+              <strong x-text="msg.recipient"></strong>
+              <template x-if="msg.topic">
+                <span class="badge badge-topic" x-text="msg.topic"></span>
+              </template>
+              <template x-if="msg.thread_id">
+                <span class="msg-thread" @click="viewThread(msg.thread_id || msg.id)">thread</span>
+              </template>
+              <template x-if="msg.reply_to">
+                <span style="color:#666;font-size:10px;" x-text="'re:#' + msg.reply_to"></span>
+              </template>
+              <span class="msg-time" x-text="relTime(msg.timestamp)"></span>
+            </div>
+            <div class="msg-payload" x-text="JSON.stringify(msg.payload)"></div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- Thread view -->
+    <template x-if="threadMessages.length > 0">
+      <div class="thread-view">
+        <span class="thread-close" @click="threadMessages = []">close thread</span>
+        <strong style="font-size:13px;">Thread #<span x-text="threadMessages[0]?.id"></span></strong>
+        <template x-for="msg in threadMessages" :key="msg.id">
+          <div class="msg-item">
+            <div class="msg-meta">
+              <span class="badge badge-type" x-text="msg.message_type"></span>
+              <strong x-text="msg.sender"></strong>
+              <span style="color:var(--text-muted);">&#8594;</span>
+              <strong x-text="msg.recipient"></strong>
+              <span class="msg-time" x-text="relTime(msg.timestamp)"></span>
+            </div>
+            <div class="msg-payload" x-text="JSON.stringify(msg.payload)"></div>
+          </div>
+        </template>
+      </div>
+    </template>
+  </div>
+
+  <!-- Tasks Tab -->
+  <div x-show="tab === 'tasks'">
+    <div class="card">
+      <div class="card-header">
+        <span>Task Board</span>
+        <span style="font-size:11px;color:var(--text-secondary);">Drag to transition</span>
+      </div>
+      <div class="card-body" style="max-height:none;">
+        <input type="text" class="search-input" x-model="taskFilter" placeholder="Filter tasks... (title, assignee)" />
+        <template x-if="filteredTasks.length === 0 && tasks.length === 0">
+          <p style="color:var(--text-muted);font-size:13px;padding:20px 0;text-align:center;">No tasks yet</p>
+        </template>
+        <div class="task-columns">
+          <template x-for="state in taskStates" :key="state">
+            <div class="task-col" :class="dragOverState === state && 'drag-over'"
+                 @dragover.prevent="dragOverState = state"
+                 @dragleave="dragOverState = null"
+                 @drop.prevent="dropTask(state)">
+              <div class="task-col-header" x-text="state + ' (' + filteredTasksByState(state).length + ')'"></div>
+              <template x-for="t in filteredTasksByState(state)" :key="t.id">
+                <div class="task-card" draggable="true"
+                     :class="dragTask?.id === t.id && 'dragging'"
+                     @dragstart="dragTask = t"
+                     @dragend="dragTask = null; dragOverState = null">
+                  <div class="task-progress" :style="'width:' + taskProgress(t.state) + '%'"></div>
+                  <div class="title" x-text="'#' + t.id + ' ' + t.title"></div>
+                  <div class="assignee" x-text="t.assignee || 'Unassigned'"></div>
+                  <div style="margin-top:4px;">
+                    <span class="badge" :class="'badge-' + t.priority" x-text="t.priority"></span>
+                  </div>
+                  <template x-if="t.watchers && t.watchers.length > 0">
+                    <div class="watchers" x-text="'Watching: ' + t.watchers.join(', ')"></div>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Agents Tab -->
+  <div x-show="tab === 'agents'">
+    <div class="card">
+      <div class="card-header">Registered Agents</div>
+      <div class="card-body">
+        <template x-if="agents.length === 0">
+          <p style="color:var(--text-muted);font-size:13px;padding:20px 0;text-align:center;">No agents registered</p>
+        </template>
+        <div class="agent-grid">
+          <template x-for="a in agents" :key="a.shorthand">
+            <div class="agent-card">
+              <div>
+                <span class="agent-dot" :class="a.is_active ? 'agent-active' : 'agent-inactive'"></span>
+                <span class="shorthand" x-text="a.shorthand"></span>
+              </div>
+              <div class="name" x-text="a.name"></div>
+              <div style="font-size:10px;color:#666;margin-top:4px;" x-text="a.role"></div>
+              <template x-if="a.capabilities && a.capabilities.length > 0">
+                <div class="caps-list">
+                  <template x-for="c in a.capabilities" :key="c.name">
+                    <span class="badge badge-cap" x-text="c.name"></span>
+                  </template>
+                </div>
+              </template>
+              <div style="font-size:10px;color:var(--text-muted);margin-top:4px;" x-text="a.last_seen ? relTime(a.last_seen) : 'Never seen'"></div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Topics Tab -->
+  <div x-show="tab === 'topics'">
+    <div class="card">
+      <div class="card-header">
+        <span>Topic Subscriptions</span>
+        <span style="font-size:11px;color:var(--text-secondary);" x-text="topics.length + ' topics'"></span>
+      </div>
+      <div class="card-body">
+        <template x-if="topics.length === 0">
+          <p style="color:var(--text-muted);font-size:13px;padding:20px 0;text-align:center;">No subscriptions yet</p>
+        </template>
+        <div class="sub-list">
+          <template x-for="t in topics" :key="t.topic">
+            <div class="sub-item">
+              <span><span class="badge badge-topic" x-text="t.topic"></span></span>
+              <span style="color:var(--text-secondary);font-size:11px;" x-text="t.subscribers.join(', ')"></span>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <div class="card-header">Subscribe</div>
+      <div class="card-body">
+        <div class="form-row">
+          <select x-model="subForm.agent">
+            <option value="">Agent...</option>
+            <template x-for="a in agents" :key="a.shorthand">
+              <option :value="a.shorthand" x-text="a.shorthand"></option>
+            </template>
+          </select>
+          <input x-model="subForm.topic" placeholder="Topic name" />
+          <button class="btn" @click="addSubscription()" :disabled="!subForm.agent || !subForm.topic">Subscribe</button>
+        </div>
+        <div class="status-msg" :class="subStatus.ok ? 'status-ok' : 'status-err'" x-text="subStatus.text"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Send Tab -->
+  <div x-show="tab === 'send'">
+    <div class="card">
+      <div class="card-header">Send Message</div>
+      <div class="card-body">
+        <div class="form-row">
+          <select x-model="sendForm.sender">
+            <option value="">Sender...</option>
+            <template x-for="a in agents" :key="a.shorthand">
+              <option :value="a.shorthand" x-text="a.shorthand + ' - ' + a.name"></option>
+            </template>
+            <option value="ORCH">ORCH</option>
+            <option value="HUMAN">HUMAN</option>
+          </select>
+          <select x-model="sendForm.recipient">
+            <option value="">Recipient...</option>
+            <template x-for="a in agents" :key="a.shorthand">
+              <option :value="a.shorthand" x-text="a.shorthand + ' - ' + a.name"></option>
+            </template>
+            <option value="ORCH">ORCH</option>
+            <option value="ALL">ALL</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <select x-model="sendForm.message_type">
+            <option value="task_assignment">task_assignment</option>
+            <option value="status_update">status_update</option>
+            <option value="deliverable">deliverable</option>
+            <option value="feedback">feedback</option>
+            <option value="question">question</option>
+            <option value="escalation">escalation</option>
+          </select>
+          <select x-model="sendForm.priority">
+            <option value="low">low</option>
+            <option value="normal" selected>normal</option>
+            <option value="high">high</option>
+            <option value="critical">critical</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <input x-model="sendForm.topic" placeholder="Topic (optional)" style="flex:1;" />
+          <input x-model="sendForm.reply_to" placeholder="Reply to msg # (optional)" type="number" style="flex:1;max-width:200px;" />
+        </div>
+        <div class="form-row">
+          <textarea x-model="sendForm.payload" placeholder='{"key": "value"}'></textarea>
+        </div>
+        <div class="form-row">
+          <button class="btn" @click="sendMessage()" :disabled="!sendForm.sender || !sendForm.recipient">Send</button>
+        </div>
+        <div class="status-msg" :class="sendStatus.ok ? 'status-ok' : 'status-err'" x-text="sendStatus.text"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <div class="card-header">Create Task</div>
+      <div class="card-body">
+        <div class="form-row">
+          <input x-model="taskForm.title" placeholder="Task title" />
+          <select x-model="taskForm.assignee">
+            <option value="">Assignee...</option>
+            <template x-for="a in agents" :key="a.shorthand">
+              <option :value="a.shorthand" x-text="a.shorthand"></option>
+            </template>
+          </select>
+          <select x-model="taskForm.priority">
+            <option value="normal" selected>normal</option>
+            <option value="low">low</option>
+            <option value="high">high</option>
+            <option value="critical">critical</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <input x-model="taskForm.description" placeholder="Description (optional)" style="flex:3;" />
+        </div>
+        <div class="form-row">
+          <button class="btn" @click="createTask()" :disabled="!taskForm.title">Create</button>
+        </div>
+        <div class="status-msg" :class="taskStatus.ok ? 'status-ok' : 'status-err'" x-text="taskStatus.text"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <div class="card-header">Register Agent</div>
+      <div class="card-body">
+        <div class="form-row">
+          <input x-model="agentForm.shorthand" placeholder="Shorthand (e.g. SE)" style="max-width:100px;" />
+          <input x-model="agentForm.name" placeholder="Name (e.g. Software Engineer)" />
+          <input x-model="agentForm.role" placeholder="Role description" />
+        </div>
+        <div class="form-row">
+          <button class="btn" @click="registerAgent()" :disabled="!agentForm.shorthand || !agentForm.name">Register</button>
+        </div>
+        <div class="status-msg" :class="agentStatus.ok ? 'status-ok' : 'status-err'" x-text="agentStatus.text"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function dashboard() {
+  return {
+    tab: 'messages',
+    wsConnected: false,
+    uptimeStr: '--',
+    stats: {},
+    messages: [],
+    tasks: [],
+    agents: [],
+    topics: [],
+    threadMessages: [],
+    showHelp: false,
+    toasts: [],
+    toastId: 0,
+    taskStates: ['CREATED', 'ASSIGNED', 'IN_PROGRESS', 'IN_REVIEW', 'REWORK', 'ACCEPTED', 'CLOSED'],
+
+    // Search/filter
+    messageFilter: '',
+    taskFilter: '',
+
+    // Unread badges
+    unread: { messages: 0, tasks: 0 },
+    lastSeenCounts: { messages: 0, tasks: 0 },
+
+    // Drag and drop
+    dragTask: null,
+    dragOverState: null,
+
+    // Forms
+    sendForm: { sender: '', recipient: '', message_type: 'task_assignment', priority: 'normal', payload: '{}', topic: '', reply_to: '' },
+    sendStatus: { text: '', ok: true },
+    taskForm: { title: '', description: '', assignee: '', priority: 'normal' },
+    taskStatus: { text: '', ok: true },
+    agentForm: { shorthand: '', name: '', role: '' },
+    agentStatus: { text: '', ok: true },
+    subForm: { agent: '', topic: '' },
+    subStatus: { text: '', ok: true },
+
+    _ws: null,
+    _reconnectTimer: null,
+
+    async init() {
+      // Initial REST fetch as fallback
+      await this.fetchAll();
+      this.lastSeenCounts.messages = this.messages.length;
+      this.lastSeenCounts.tasks = this.tasks.length;
+      // Connect WebSocket
+      this.connectWS();
+    },
+
+    connectWS() {
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      this._ws = new WebSocket(`${proto}//${location.host}/ws`);
+      this._ws.onopen = () => { this.wsConnected = true; };
+      this._ws.onclose = () => {
+        this.wsConnected = false;
+        this._reconnectTimer = setTimeout(() => this.connectWS(), 3000);
+      };
+      this._ws.onerror = () => { this._ws.close(); };
+      this._ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === 'update') {
+          const oldMsgCount = this.messages.length;
+          const oldTaskCount = this.tasks.length;
+
+          if (data.health) {
+            const s = data.health.uptime_seconds;
+            const h = Math.floor(s / 3600);
+            const m = Math.floor((s % 3600) / 60);
+            this.uptimeStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
+          }
+          if (data.stats) this.stats = data.stats;
+          if (data.messages) {
+            this.messages = data.messages;
+            // Toast + unread for new messages
+            const newCount = data.messages.length - oldMsgCount;
+            if (newCount > 0 && oldMsgCount > 0) {
+              const newest = data.messages[0];
+              this.addToast(`${newest.sender} -> ${newest.recipient}: ${newest.message_type}`, 'message');
+              if (this.tab !== 'messages') this.unread.messages += newCount;
+            }
+          }
+          if (data.tasks) {
+            this.tasks = data.tasks;
+            const newCount = data.tasks.length - oldTaskCount;
+            if (newCount > 0 && oldTaskCount > 0) {
+              const newest = data.tasks[0];
+              this.addToast(`Task: ${newest.title} [${newest.state}]`, 'task');
+              if (this.tab !== 'tasks') this.unread.tasks += newCount;
+            }
+          }
+          if (data.agents) this.agents = data.agents;
+          if (data.topics) this.topics = data.topics;
+        }
+      };
+    },
+
+    async fetchAll() {
+      try {
+        const [health, stats, msgs, tasks, agents] = await Promise.all([
+          fetch('/health').then(r => r.json()),
+          fetch('/stats').then(r => r.json()),
+          fetch('/messages?limit=50').then(r => r.json()),
+          fetch('/tasks?limit=100').then(r => r.json()),
+          fetch('/agents').then(r => r.json()),
+        ]);
+        const s = health.uptime_seconds;
+        const h = Math.floor(s / 3600);
+        const m = Math.floor((s % 3600) / 60);
+        this.uptimeStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
+        this.stats = stats;
+        this.messages = msgs;
+        this.tasks = tasks;
+        this.agents = agents;
+      } catch {}
+    },
+
+    // Computed-like getters
+    get filteredMessages() {
+      if (!this.messageFilter) return this.messages;
+      const q = this.messageFilter.toLowerCase();
+      return this.messages.filter(m =>
+        m.sender.toLowerCase().includes(q) ||
+        m.recipient.toLowerCase().includes(q) ||
+        m.message_type.toLowerCase().includes(q) ||
+        (m.topic && m.topic.toLowerCase().includes(q)) ||
+        JSON.stringify(m.payload).toLowerCase().includes(q)
+      );
+    },
+
+    get filteredTasks() {
+      if (!this.taskFilter) return this.tasks;
+      const q = this.taskFilter.toLowerCase();
+      return this.tasks.filter(t =>
+        t.title.toLowerCase().includes(q) ||
+        (t.assignee && t.assignee.toLowerCase().includes(q)) ||
+        t.state.toLowerCase().includes(q)
+      );
+    },
+
+    filteredTasksByState(state) {
+      return this.filteredTasks.filter(t => t.state === state);
+    },
+
+    switchTab(name) {
+      this.tab = name;
+      if (name === 'messages') this.unread.messages = 0;
+      if (name === 'tasks') this.unread.tasks = 0;
+    },
+
+    handleKey(e) {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+      const map = { '1': 'messages', '2': 'tasks', '3': 'agents', '4': 'topics', '5': 'send' };
+      if (map[e.key]) { this.switchTab(map[e.key]); e.preventDefault(); }
+      if (e.key === 'r') { this.fetchAll(); e.preventDefault(); }
+      if (e.key === '/') { this.focusSearch(); e.preventDefault(); }
+      if (e.key === '?') { this.showHelp = !this.showHelp; e.preventDefault(); }
+      if (e.key === 'Escape') { this.showHelp = false; this.threadMessages = []; }
+    },
+
+    focusSearch() {
+      if (this.tab === 'messages' && this.$refs.msgSearch) this.$refs.msgSearch.focus();
+    },
+
+    relTime(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      const diff = (Date.now() - d.getTime()) / 1000;
+      if (diff < 60) return 'just now';
+      if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+      if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+      return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    },
+
+    taskProgress(state) {
+      const map = { CREATED: 0, ASSIGNED: 17, IN_PROGRESS: 33, IN_REVIEW: 50, REWORK: 50, ACCEPTED: 83, CLOSED: 100 };
+      return map[state] || 0;
+    },
+
+    // Toasts
+    addToast(text, type) {
+      const id = ++this.toastId;
+      this.toasts.push({ id, text, type });
+      setTimeout(() => this.removeToast(id), 3500);
+    },
+    removeToast(id) {
+      this.toasts = this.toasts.filter(t => t.id !== id);
+    },
+
+    // Drag and drop for tasks
+    async dropTask(newState) {
+      this.dragOverState = null;
+      if (!this.dragTask) return;
+      const task = this.dragTask;
+      this.dragTask = null;
+      if (task.state === newState) return;
+      try {
+        const r = await fetch(`/tasks/${task.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ state: newState }),
+        });
+        if (!r.ok) {
+          const e = await r.json();
+          this.addToast(e.detail || 'Invalid transition', 'task');
+        }
+      } catch (e) {
+        this.addToast(e.message, 'task');
+      }
+    },
+
+    async viewThread(threadId) {
+      try {
+        const r = await fetch(`/messages/${threadId}/thread`);
+        this.threadMessages = await r.json();
+      } catch {}
+    },
+
+    async sendMessage() {
+      try {
+        let payload = {};
+        try { payload = JSON.parse(this.sendForm.payload); } catch { payload = { text: this.sendForm.payload }; }
+        const body = {
+          sender: this.sendForm.sender,
+          recipient: this.sendForm.recipient,
+          message_type: this.sendForm.message_type,
+          priority: this.sendForm.priority,
+          payload: payload,
+        };
+        if (this.sendForm.topic) body.topic = this.sendForm.topic;
+        if (this.sendForm.reply_to) body.reply_to = parseInt(this.sendForm.reply_to);
+        const r = await fetch('/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (r.ok) {
+          this.sendStatus = { text: 'Message sent', ok: true };
+          this.sendForm.payload = '{}';
+          this.sendForm.topic = '';
+          this.sendForm.reply_to = '';
+        } else {
+          const e = await r.json();
+          this.sendStatus = { text: e.detail || 'Error', ok: false };
+        }
+      } catch (e) {
+        this.sendStatus = { text: e.message, ok: false };
+      }
+    },
+
+    async createTask() {
+      try {
+        const r = await fetch('/tasks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: this.taskForm.title,
+            description: this.taskForm.description,
+            assignee: this.taskForm.assignee || null,
+            priority: this.taskForm.priority,
+          }),
+        });
+        if (r.ok) {
+          this.taskStatus = { text: 'Task created', ok: true };
+          this.taskForm.title = '';
+          this.taskForm.description = '';
+        } else {
+          const e = await r.json();
+          this.taskStatus = { text: e.detail || 'Error', ok: false };
+        }
+      } catch (e) {
+        this.taskStatus = { text: e.message, ok: false };
+      }
+    },
+
+    async registerAgent() {
+      try {
+        const r = await fetch('/agents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            shorthand: this.agentForm.shorthand,
+            name: this.agentForm.name,
+            role: this.agentForm.role,
+          }),
+        });
+        if (r.ok) {
+          this.agentStatus = { text: 'Agent registered', ok: true };
+          this.agentForm = { shorthand: '', name: '', role: '' };
+        } else {
+          const e = await r.json();
+          this.agentStatus = { text: e.detail || 'Error', ok: false };
+        }
+      } catch (e) {
+        this.agentStatus = { text: e.message, ok: false };
+      }
+    },
+
+    async addSubscription() {
+      try {
+        const r = await fetch('/subscriptions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ agent: this.subForm.agent, topic: this.subForm.topic }),
+        });
+        if (r.ok) {
+          this.subStatus = { text: 'Subscribed', ok: true };
+          this.subForm.topic = '';
+        } else {
+          const e = await r.json();
+          this.subStatus = { text: e.detail || 'Error', ok: false };
+        }
+      } catch (e) {
+        this.subStatus = { text: e.message, ok: false };
+      }
+    },
+  };
+}
+</script>
+</body>
+</html>

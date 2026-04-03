@@ -1,0 +1,22 @@
+services:
+  message-bus:
+    build: .
+    container_name: message-bus
+    restart: unless-stopped
+    ports:
+      - "8585:8585"
+    volumes:
+      - ./data:/app/data
+      - ~/agent-share:/agent-share:ro
+    networks:
+      - agent-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8585/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+networks:
+  agent-net:
+    external: true
