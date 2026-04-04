@@ -1,9 +1,17 @@
 """LangGraph tools — what BOB can do."""
 
+import asyncio
 import json
+import functools
+import inspect
+import logging
 from datetime import datetime, timezone
+import httpx
 from langchain_core.tools import tool
 from app import bus_client, memory
+from app.firewall import gate, FirewallDecision
+
+logger = logging.getLogger("bob.tools")
 
 
 @tool
@@ -131,6 +139,28 @@ def resume_scheduled_job(job_id: str) -> str:
 
 
 @tool
+def add_scheduled_job(job_id: str, label: str, task: str, cron_json: str, priority: str = "normal") -> str:
+    """Add a new recurring scheduled job. cron_json is a JSON object with APScheduler cron fields like {"day_of_week": "mon", "hour": 9, "minute": 0} or {"hour": 8, "minute": 30} for daily."""
+    from app.scheduler import add_job
+    cron = json.loads(cron_json)
+    return json.dumps(add_job(job_id, label, task, cron, priority))
+
+
+@tool
+def remove_scheduled_job(job_id: str) -> str:
+    """Remove a recurring scheduled job permanently. Use list_scheduled_jobs to see available job IDs."""
+    from app.scheduler import remove_job
+    return json.dumps(remove_job(job_id))
+
+
+@tool
+def trigger_job_now(job_id: str) -> str:
+    """Run a scheduled job immediately without waiting for its next scheduled time. Does not affect the normal schedule."""
+    from app.scheduler import run_job_now
+    return json.dumps(run_job_now(job_id))
+
+
+@tool
 async def check_email() -> str:
     """Check the ATG Gmail inbox for new unread emails. Returns classified email summaries."""
     from app.gmail_monitor import check_inbox
@@ -140,8 +170,204 @@ async def check_email() -> str:
     return json.dumps(emails)
 
 
-# All tools BOB has access to
-ALL_TOOLS = [
+@tool
+async def generate_daily_briefing() -> str:
+    """Compile the daily morning briefing — system health, email status, voice usage, task activity, and upcoming scheduled work. Use this for the daily report or when Rob asks for a status update."""
+    from app.daily_report import compose_daily_report
+    return await compose_daily_report()
+
+
+@tool
+def email_mark_read(msg_id: str) -> str:
+    """Mark a Gmail message as read. Use the message ID from check_email results."""
+    from app.gmail_monitor import mark_as_read
+    success = mark_as_read(msg_id)
+    return json.dumps({"status": "marked_read" if success else "failed", "msg_id": msg_id})
+
+
+@tool
+def email_archive(msg_id: str) -> str:
+    """Archive a Gmail message (removes from inbox). Use the message ID from check_email results."""
+    from app.gmail_monitor import archive_message
+    success = archive_message(msg_id)
+    return json.dumps({"status": "archived" if success else "failed", "msg_id": msg_id})
+
+
+@tool
+def email_add_label(msg_id: str, label: str) -> str:
+    """Add a label to a Gmail message. Creates the label if it doesn't exist. Useful for organizing: 'BOB-Reviewed', 'Needs-Reply', 'Player-Support', etc."""
+    from app.gmail_monitor import add_label
+    result = add_label(msg_id, label)
+    return json.dumps(result)
+
+
+@tool
+def email_list_labels() -> str:
+    """List all Gmail labels available on the ATG account."""
+    from app.gmail_monitor import list_labels
+    labels = list_labels()
+    return json.dumps(labels)
+
+
+@tool
+def check_server_resources() -> str:
+    """Check server CPU, memory, and disk usage. Flags anything above 80% as a warning."""
+    import psutil
+    cpu_pct = psutil.cpu_percent(interval=1)
+    mem = psutil.virtual_memory()
+    disk = psutil.disk_usage("/")
+
+    warnings = []
+    if cpu_pct > 80:
+        warnings.append(f"CPU at {cpu_pct}%")
+    if mem.percent > 80:
+        warnings.append(f"Memory at {mem.percent}%")
+    if disk.percent > 80:
+        warnings.append(f"Disk at {disk.percent}%")
+
+    return json.dumps({
+        "cpu_percent": cpu_pct,
+        "memory": {
+            "total_gb": round(mem.total / (1024**3), 1),
+            "used_gb": round(mem.used / (1024**3), 1),
+            "percent": mem.percent,
+        },
+        "disk": {
+            "total_gb": round(disk.total / (1024**3), 1),
+            "used_gb": round(disk.used / (1024**3), 1),
+            "percent": disk.percent,
+        },
+        "warnings": warnings or None,
+        "status": "warning" if warnings else "healthy",
+    })
+
+
+@tool
+async def check_system_health() -> str:
+    """Check the health of all infrastructure services — message bus, ChromaDB, Langfuse, ntfy, ElevenLabs API. Returns status for each service."""
+    import os
+    services = {
+        "message_bus": os.getenv("MESSAGE_BUS_URL", "http://message-bus:8585") + "/stats",
+        "chromadb": os.getenv("CHROMADB_URL", "http://chromadb:8000") + "/api/v1/heartbeat",
+        "langfuse": os.getenv("LANGFUSE_HOST", "http://langfuse:3000") + "/api/public/health",
+        "ntfy": os.getenv("NTFY_URL", "http://ntfy:80") + "/v1/health",
+    }
+
+    results = {}
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        for name, url in services.items():
+            try:
+                resp = await client.get(url)
+                results[name] = {
+                    "status": "ok" if resp.status_code < 400 else "degraded",
+                    "code": resp.status_code,
+                }
+            except httpx.ConnectError:
+                results[name] = {"status": "down", "error": "connection refused"}
+            except httpx.TimeoutException:
+                results[name] = {"status": "down", "error": "timeout"}
+            except Exception as e:
+                results[name] = {"status": "unknown", "error": str(e)}
+
+    # ElevenLabs API (external)
+    el_key = os.getenv("ELEVENLABS_API_KEY", "")
+    if el_key:
+        try:
+            async with httpx.AsyncClient(timeout=8.0) as client:
+                resp = await client.get(
+                    "https://api.elevenlabs.io/v1/user/subscription",
+                    headers={"xi-api-key": el_key},
+                )
+                if resp.status_code == 200:
+                    results["elevenlabs"] = {"status": "ok", "code": 200}
+                elif resp.status_code == 401:
+                    results["elevenlabs"] = {"status": "auth_failed", "code": 401}
+                else:
+                    results["elevenlabs"] = {"status": "degraded", "code": resp.status_code}
+        except Exception as e:
+            results["elevenlabs"] = {"status": "unreachable", "error": str(e)}
+
+    # Bus queue depth
+    from app.bus_client import get_queue_depth
+    results["bus_offline_queue"] = get_queue_depth()
+
+    # Overall
+    down = [k for k, v in results.items() if isinstance(v, dict) and v.get("status") == "down"]
+    results["overall"] = "degraded" if down else "healthy"
+
+    return json.dumps(results)
+
+
+@tool
+async def check_voice_usage() -> str:
+    """Check ElevenLabs voice minute and character usage for the current billing period. Shows plan tier, minutes used/remaining, and character consumption."""
+    from app.elevenlabs_monitor import run_usage_sweep
+    result = await run_usage_sweep()
+    return json.dumps(result)
+
+
+@tool
+async def check_confirmation(confirmation_id: str) -> str:
+    """Check the status of a HIGH-risk tool confirmation. Use this after a tool was blocked pending Rob's approval. Returns: approved, rejected, expired, or pending."""
+    from app.firewall import _pending
+    conf = _pending.get(confirmation_id)
+    if not conf:
+        return json.dumps({"status": "not_found", "confirmation_id": confirmation_id})
+    if conf.is_expired and conf.status == "pending":
+        conf.status = "expired"
+    return json.dumps({
+        "status": conf.status,
+        "confirmation_id": confirmation_id,
+        "tool": conf.tool_name,
+        "seconds_remaining": conf.seconds_remaining,
+    })
+
+
+def _firewall_wrap(tool_fn):
+    """Wrap a LangGraph tool so every call passes through the firewall gate.
+
+    LOW/MEDIUM: execute normally (with audit logging).
+    HIGH: block execution, return a message with the confirmation ID.
+    INJECTION: deny execution entirely.
+    """
+    original_func = tool_fn.coroutine if hasattr(tool_fn, 'coroutine') else tool_fn.func
+
+    if inspect.iscoroutinefunction(original_func):
+        @functools.wraps(original_func)
+        async def wrapper(*args, **kwargs):
+            result = gate(tool_fn.name, kwargs)
+            if result.decision == FirewallDecision.DENY_INJECTION:
+                return json.dumps({"error": "BLOCKED", "reason": result.reason})
+            if result.decision == FirewallDecision.PENDING:
+                return json.dumps({
+                    "status": "BLOCKED_PENDING_CONFIRMATION",
+                    "confirmation_id": result.confirmation_id,
+                    "reason": result.reason,
+                    "instruction": "Tell Rob this action requires his approval. He can confirm via the dashboard or API: POST /firewall/confirm/" + result.confirmation_id,
+                })
+            return await original_func(*args, **kwargs)
+        tool_fn.coroutine = wrapper
+    else:
+        @functools.wraps(original_func)
+        def wrapper(*args, **kwargs):
+            result = gate(tool_fn.name, kwargs)
+            if result.decision == FirewallDecision.DENY_INJECTION:
+                return json.dumps({"error": "BLOCKED", "reason": result.reason})
+            if result.decision == FirewallDecision.PENDING:
+                return json.dumps({
+                    "status": "BLOCKED_PENDING_CONFIRMATION",
+                    "confirmation_id": result.confirmation_id,
+                    "reason": result.reason,
+                    "instruction": "Tell Rob this action requires his approval. He can confirm via the dashboard or API: POST /firewall/confirm/" + result.confirmation_id,
+                })
+            return original_func(*args, **kwargs)
+        tool_fn.func = wrapper
+
+    return tool_fn
+
+
+# All tools BOB has access to — wrapped with firewall gate
+_TOOLS = [
     create_task,
     send_message,
     check_tasks,
@@ -157,4 +383,17 @@ ALL_TOOLS = [
     list_scheduled_jobs,
     pause_scheduled_job,
     resume_scheduled_job,
+    check_voice_usage,
+    check_system_health,
+    check_server_resources,
+    email_mark_read,
+    email_archive,
+    email_add_label,
+    email_list_labels,
+    add_scheduled_job,
+    remove_scheduled_job,
+    trigger_job_now,
+    generate_daily_briefing,
 ]
+
+ALL_TOOLS = [_firewall_wrap(t) for t in _TOOLS] + [check_confirmation]

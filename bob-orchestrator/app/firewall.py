@@ -23,6 +23,7 @@ logger = logging.getLogger("bob.firewall")
 
 # ── Risk levels ──────────────────────────────────────────────────────────────
 
+
 class RiskLevel(Enum):
     LOW = "low"
     MEDIUM = "medium"
@@ -47,13 +48,29 @@ TOOL_REGISTRY = {
     "send_message": RiskLevel.MEDIUM,
     "remember": RiskLevel.MEDIUM,
     "notify_rob": RiskLevel.MEDIUM,
-}
+    "check_email": RiskLevel.LOW,
+    "check_voice_usage": RiskLevel.LOW,
+    "check_system_health": RiskLevel.LOW,
+    "check_server_resources": RiskLevel.LOW,
+    "email_mark_read": RiskLevel.MEDIUM,
+    "email_archive": RiskLevel.MEDIUM,
+    "email_add_label": RiskLevel.MEDIUM,
+    "email_list_labels": RiskLevel.LOW,
+    "add_scheduled_job": RiskLevel.MEDIUM,
+    "remove_scheduled_job": RiskLevel.MEDIUM,
+    "trigger_job_now": RiskLevel.MEDIUM,
+    "generate_daily_briefing": RiskLevel.LOW,
+    "list_scheduled_jobs": RiskLevel.LOW,
+    "pause_scheduled_job": RiskLevel.MEDIUM,
+    "resume_scheduled_job": RiskLevel.MEDIUM,
 
-# HIGH-risk tools can be added here as BOB gains more capabilities:
-# "publish_changes": RiskLevel.HIGH,
-# "rollback_changes": RiskLevel.HIGH,
-# "approve_review": RiskLevel.HIGH,
-# "reject_review": RiskLevel.HIGH,
+    # HIGH-risk tools — require Rob's confirmation before execution
+    # Uncomment as BOB gains these capabilities:
+    # "publish_changes": RiskLevel.HIGH,
+    # "rollback_changes": RiskLevel.HIGH,
+    # "approve_review": RiskLevel.HIGH,
+    # "reject_review": RiskLevel.HIGH,
+}
 
 
 # ── Prompt injection scanner ─────────────────────────────────────────────────

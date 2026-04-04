@@ -1,6 +1,10 @@
 # Secrets
 .env
 *.env
+credentials.json
+token.json
+gmail_token.json
+gmail_credentials.json
 
 # Data
 data/

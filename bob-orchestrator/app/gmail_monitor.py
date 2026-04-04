@@ -22,7 +22,10 @@ logger = logging.getLogger("bob.gmail")
 TOKEN_PATH = os.getenv("GMAIL_TOKEN_PATH", "/app/gmail_token.json")
 CREDENTIALS_PATH = os.getenv("GMAIL_CREDENTIALS_PATH", "/app/gmail_credentials.json")
 POLL_INTERVAL = int(os.getenv("GMAIL_POLL_INTERVAL", "300"))  # 5 minutes
-SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
+SCOPES = [
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/gmail.modify",  # Mark as read, apply/remove labels
+]
 
 # Track last seen message to avoid re-processing
 _last_history_id = None
@@ -160,8 +163,143 @@ async def check_inbox() -> list[dict]:
     return new_emails
 
 
-async def poll_loop(notify_callback=None):
-    """Background loop — check inbox every POLL_INTERVAL seconds."""
+# ── Gmail modify operations ─────────────────────────────────────────────────
+
+def mark_as_read(msg_id: str) -> bool:
+    """Remove UNREAD label from a message."""
+    service = _get_gmail_service()
+    if not service:
+        return False
+    try:
+        service.users().messages().modify(
+            userId="me", id=msg_id,
+            body={"removeLabelIds": ["UNREAD"]},
+        ).execute()
+        logger.info(f"Marked as read: {msg_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to mark as read {msg_id}: {e}")
+        return False
+
+
+def mark_as_unread(msg_id: str) -> bool:
+    """Add UNREAD label back to a message."""
+    service = _get_gmail_service()
+    if not service:
+        return False
+    try:
+        service.users().messages().modify(
+            userId="me", id=msg_id,
+            body={"addLabelIds": ["UNREAD"]},
+        ).execute()
+        return True
+    except Exception as e:
+        logger.error(f"Failed to mark as unread {msg_id}: {e}")
+        return False
+
+
+def add_label(msg_id: str, label_name: str) -> dict:
+    """Add a label to a message. Creates the label if it doesn't exist."""
+    service = _get_gmail_service()
+    if not service:
+        return {"error": "Gmail service unavailable"}
+    try:
+        # Find or create label
+        label_id = _get_or_create_label(service, label_name)
+        service.users().messages().modify(
+            userId="me", id=msg_id,
+            body={"addLabelIds": [label_id]},
+        ).execute()
+        return {"status": "labeled", "label": label_name, "msg_id": msg_id}
+    except Exception as e:
+        logger.error(f"Failed to add label '{label_name}' to {msg_id}: {e}")
+        return {"error": str(e)}
+
+
+def remove_label(msg_id: str, label_name: str) -> dict:
+    """Remove a label from a message."""
+    service = _get_gmail_service()
+    if not service:
+        return {"error": "Gmail service unavailable"}
+    try:
+        label_id = _find_label(service, label_name)
+        if not label_id:
+            return {"error": f"Label '{label_name}' not found"}
+        service.users().messages().modify(
+            userId="me", id=msg_id,
+            body={"removeLabelIds": [label_id]},
+        ).execute()
+        return {"status": "label_removed", "label": label_name, "msg_id": msg_id}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def archive_message(msg_id: str) -> bool:
+    """Archive a message (remove INBOX label)."""
+    service = _get_gmail_service()
+    if not service:
+        return False
+    try:
+        service.users().messages().modify(
+            userId="me", id=msg_id,
+            body={"removeLabelIds": ["INBOX"]},
+        ).execute()
+        logger.info(f"Archived: {msg_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to archive {msg_id}: {e}")
+        return False
+
+
+def list_labels() -> list[dict]:
+    """List all Gmail labels."""
+    service = _get_gmail_service()
+    if not service:
+        return []
+    try:
+        results = service.users().labels().list(userId="me").execute()
+        return [{"id": label["id"], "name": label["name"], "type": label.get("type", "")}
+                for label in results.get("labels", [])]
+    except Exception as e:
+        logger.error(f"Failed to list labels: {e}")
+        return []
+
+
+def _find_label(service, label_name: str) -> str | None:
+    """Find a label ID by name."""
+    try:
+        results = service.users().labels().list(userId="me").execute()
+        for label in results.get("labels", []):
+            if label["name"].lower() == label_name.lower():
+                return label["id"]
+    except Exception:
+        pass
+    return None
+
+
+def _get_or_create_label(service, label_name: str) -> str:
+    """Find a label by name, or create it."""
+    label_id = _find_label(service, label_name)
+    if label_id:
+        return label_id
+    # Create it
+    body = {
+        "name": label_name,
+        "labelListVisibility": "labelShow",
+        "messageListVisibility": "show",
+    }
+    result = service.users().labels().create(userId="me", body=body).execute()
+    logger.info(f"Created Gmail label: {label_name}")
+    return result["id"]
+
+
+async def poll_loop(notify_callback=None, email_callback=None):
+    """Background loop — check inbox every POLL_INTERVAL seconds.
+
+    Args:
+        notify_callback: async fn(topic, title, message, priority) for push notifications
+        email_callback: fn(email_summary) to surface emails on the dashboard
+    """
     logger.info(f"Gmail monitor started. Polling every {POLL_INTERVAL}s")
 
     while True:
@@ -170,7 +308,14 @@ async def poll_loop(notify_callback=None):
             for email in new_emails:
                 logger.info(f"New email: [{email['category']}] {email['subject']} from {email['from']}")
 
-                # Notify for critical/high priority
+                # Surface actionable emails on dashboard
+                if email_callback and email["priority"] in ("urgent", "high", "default"):
+                    try:
+                        email_callback(email)
+                    except Exception as e:
+                        logger.error(f"Email callback error: {e}")
+
+                # Push notify for critical/high priority
                 if notify_callback and email["priority"] in ("urgent", "high"):
                     topic_map = {cat: cfg["topic"] for cat, cfg in CATEGORIES.items() if cfg["topic"]}
                     topic = topic_map.get(email["category"], "bob-status")

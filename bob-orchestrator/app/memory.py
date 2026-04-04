@@ -72,3 +72,88 @@ def get_all(collection: str) -> list[dict]:
             "metadata": results["metadatas"][i] if results["metadatas"] else {},
         })
     return docs
+
+
+# ── Seed data ───────────────────────────────────────────────────────────────
+
+SEED_DATA = {
+    "brand_voice": [
+        {
+            "id": "brand_identity",
+            "text": "ATG (Appalachian Toys & Games) is a handcrafted, Appalachian heritage brand. The brand is rustic, authentic, warm, and grounded. We make things that feel like they came from the mountains — because they did. No corporate polish. No Silicon Valley slickness. Real craftsmanship, real stories, real Appalachian roots.",
+            "metadata": {"type": "identity", "source": "Rob"},
+        },
+        {
+            "id": "brand_colors",
+            "text": "ATG color palette: Primary green and amber. These evoke the Appalachian forest and warm mountain light. Use these consistently across all materials — website, app store, marketing, packaging.",
+            "metadata": {"type": "visual", "source": "Rob"},
+        },
+        {
+            "id": "brand_tone",
+            "text": "ATG brand voice is warm, direct, and unpretentious. We say what we mean. We don't use corporate buzzwords or marketing fluff. We talk like neighbors, not advertisers. Humor is welcome — cleverness over snark. The feeling should be: you're talking to someone who made this thing with their hands and is proud of it.",
+            "metadata": {"type": "tone", "source": "Rob"},
+        },
+        {
+            "id": "brand_donts",
+            "text": "ATG brand anti-patterns: Never use 'disrupt', 'synergy', 'leverage', 'pivot', or startup jargon. Never sound corporate. Never apologize for being small — it's a feature. Never copy big-studio marketing language. Never lose the Appalachian identity to appeal to a broader audience.",
+            "metadata": {"type": "constraints", "source": "Rob"},
+        },
+    ],
+    "decisions": [
+        {
+            "id": "decision_mobile_game_primary",
+            "text": "2026-03-18: Mobile game designated as primary revenue project. Bear Creek Trail — 3-row match game, Appalachian theme, black bears and banjos. Android first, iOS after Android launch. Revenue is the success metric, not downloads.",
+            "metadata": {"date": "2026-03-18", "made_by": "Rob"},
+        },
+        {
+            "id": "decision_platform_sequence",
+            "text": "2026-03-18: Android launches first via Google Play. iOS follows only after Android is live and revenue-generating. Do not start iOS until Android validates the concept.",
+            "metadata": {"date": "2026-03-18", "made_by": "Rob"},
+        },
+        {
+            "id": "decision_suno_music",
+            "text": "2026-03-18: Suno.com account active for AI music generation. Available for agents to use on game soundtrack and marketing audio.",
+            "metadata": {"date": "2026-03-18", "made_by": "Rob"},
+        },
+    ],
+    "product_specs": [
+        {
+            "id": "bear_creek_trail_overview",
+            "text": "Bear Creek Trail: Mobile match-3 game. 3-row play area. Appalachian theme — black bears, banjos, mason jars, mountain wildflowers, fireflies. Target: casual mobile gamers. Monetization: in-app purchases + ads. Built in Unity.",
+            "metadata": {"project": "PROJECT-01", "type": "overview"},
+        },
+    ],
+    "project_context": [
+        {
+            "id": "project01_status",
+            "text": "PROJECT-01 Bear Creek Trail: Active development. Primary revenue project. Game production, app store deployment, and marketing campaign all in scope. Engineering and Marketing teams run in parallel. Home server resources are finite — this project gets priority above all others.",
+            "metadata": {"project": "PROJECT-01", "status": "active"},
+        },
+        {
+            "id": "project02_status",
+            "text": "PROJECT-02 ATG Website: Ongoing maintenance. www.appalachiantoysgames.com. Static HTML/CSS/JS on Nginx. Minor changes auto-publish after QA. Major changes go to staging for Rob review.",
+            "metadata": {"project": "PROJECT-02", "status": "maintenance"},
+        },
+    ],
+}
+
+
+def seed_collections():
+    """Seed collections with baseline ATG data. Only adds docs that don't already exist."""
+    client = get_client()
+    seeded = 0
+    for collection_name, docs in SEED_DATA.items():
+        col = client.get_collection(collection_name)
+        existing = col.get()
+        existing_ids = set(existing["ids"]) if existing["ids"] else set()
+
+        for doc in docs:
+            if doc["id"] not in existing_ids:
+                col.upsert(
+                    ids=[doc["id"]],
+                    documents=[doc["text"]],
+                    metadatas=[doc["metadata"]],
+                )
+                seeded += 1
+
+    return seeded

@@ -52,7 +52,7 @@ DEFAULT_SCHEDULES = [
     {
         "job_id": "daily_briefing",
         "label": "Daily morning briefing",
-        "task": "Compile daily briefing: yesterday's completed tasks, costs, pending reviews, system health, and any alerts.",
+        "task": "Generate the daily briefing using the generate_daily_briefing tool. Summarize the key points and send a push notification to Rob with the highlights.",
         "priority": "high",
         "cron": {"hour": 8, "minute": 0},
     },
@@ -195,3 +195,17 @@ def resume_job(job_id: str) -> dict:
     scheduler = get_scheduler()
     scheduler.resume_job(job_id)
     return {"job_id": job_id, "status": "resumed"}
+
+
+def run_job_now(job_id: str) -> dict:
+    """Trigger a scheduled job immediately (doesn't affect next scheduled run)."""
+    scheduler = get_scheduler()
+    job = scheduler.get_job(job_id)
+    if not job:
+        return {"job_id": job_id, "status": "error", "message": "Job not found"}
+    try:
+        _execute_scheduled_task(**job.kwargs)
+        logger.info(f"Manually triggered job: {job_id}")
+        return {"job_id": job_id, "status": "triggered"}
+    except Exception as e:
+        return {"job_id": job_id, "status": "error", "message": str(e)}

@@ -18,6 +18,9 @@ LANGFUSE_PUBLIC_KEY = os.getenv("LANGFUSE_PUBLIC_KEY", "")
 LANGFUSE_SECRET_KEY = os.getenv("LANGFUSE_SECRET_KEY", "")
 LANGFUSE_HOST = os.getenv("LANGFUSE_HOST", "http://langfuse:3000")
 
+# Checkpointer (persistent conversation history)
+CHECKPOINT_DB_PATH = os.getenv("CHECKPOINT_DB_PATH", "/app/data/bob-threads.db")
+
 # Scheduler
 REPORT_HOUR = int(os.getenv("BOB_REPORT_HOUR", "8"))
 REPORT_MINUTE = int(os.getenv("BOB_REPORT_MINUTE", "0"))
