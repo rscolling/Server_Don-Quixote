@@ -60,6 +60,14 @@ TOOL_REGISTRY = {
     "remove_scheduled_job": RiskLevel.MEDIUM,
     "trigger_job_now": RiskLevel.MEDIUM,
     "generate_daily_briefing": RiskLevel.LOW,
+    "check_paused_tasks": RiskLevel.LOW,
+    "dismiss_paused_task": RiskLevel.MEDIUM,
+    "delegate_task": RiskLevel.MEDIUM,
+    "propose_memory": RiskLevel.MEDIUM,
+    "review_pending_proposals": RiskLevel.LOW,
+    "approve_proposal": RiskLevel.MEDIUM,
+    "reject_proposal": RiskLevel.MEDIUM,
+    "check_confirmation": RiskLevel.LOW,
     "list_scheduled_jobs": RiskLevel.LOW,
     "pause_scheduled_job": RiskLevel.MEDIUM,
     "resume_scheduled_job": RiskLevel.MEDIUM,
@@ -159,20 +167,53 @@ def reject(confirmation_id: str) -> PendingConfirmation | None:
 
 
 def get_pending() -> list[PendingConfirmation]:
-    # Clean expired
+    # Clean expired and remove old entries
+    stale = []
     for cid, conf in list(_pending.items()):
         if conf.is_expired and conf.status == "pending":
             conf.status = "expired"
+        # Remove entries older than 2x timeout (cleanup)
+        if time.time() - conf.queued_at > conf.timeout_seconds * 2:
+            stale.append(cid)
+    for cid in stale:
+        del _pending[cid]
     return [c for c in _pending.values() if c.status == "pending"]
 
 
 # ── Audit log ────────────────────────────────────────────────────────────────
 
-AUDIT_LOG_PATH = os.getenv("AUDIT_LOG_PATH", "/app/data/bob-audit.jsonl")
+from app.config import AUDIT_LOG_PATH
+AUDIT_LOG_MAX_SIZE = int(os.getenv("AUDIT_LOG_MAX_SIZE_MB", "10")) * 1024 * 1024  # 10MB default
+AUDIT_LOG_ROTATE_COUNT = 3  # Keep 3 rotated logs
+
+
+def _rotate_audit_log():
+    """Rotate audit log if it exceeds max size."""
+    try:
+        log_path = Path(AUDIT_LOG_PATH)
+        if not log_path.exists():
+            return
+        if log_path.stat().st_size < AUDIT_LOG_MAX_SIZE:
+            return
+
+        # Rotate: .jsonl.2 → .jsonl.3, .jsonl.1 → .jsonl.2, .jsonl → .jsonl.1
+        for i in range(AUDIT_LOG_ROTATE_COUNT, 0, -1):
+            old = Path(f"{AUDIT_LOG_PATH}.{i}")
+            new = Path(f"{AUDIT_LOG_PATH}.{i + 1}")
+            if old.exists():
+                if i == AUDIT_LOG_ROTATE_COUNT:
+                    old.unlink()  # Delete oldest
+                else:
+                    old.rename(new)
+
+        log_path.rename(Path(f"{AUDIT_LOG_PATH}.1"))
+        logger.info("Audit log rotated")
+    except Exception as e:
+        logger.error(f"Audit log rotation failed: {e}")
 
 
 def write_audit(event: str, tool: str, risk: str, details: dict | None = None):
-    """Append one JSON line to the immutable audit log."""
+    """Append one JSON line to the audit log. Auto-rotates at max size."""
     entry = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "event": event,
@@ -184,6 +225,7 @@ def write_audit(event: str, tool: str, risk: str, details: dict | None = None):
         entry["details"] = details
     try:
         Path(AUDIT_LOG_PATH).parent.mkdir(parents=True, exist_ok=True)
+        _rotate_audit_log()
         with open(AUDIT_LOG_PATH, "a") as f:
             f.write(json.dumps(entry) + "\n")
     except Exception as e:

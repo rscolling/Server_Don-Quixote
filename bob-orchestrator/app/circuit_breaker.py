@@ -67,9 +67,7 @@ class CircuitBreaker:
                 return True
             return False
 
-        if self.state == State.HALF_OPEN:
-            return True
-
+        # HALF_OPEN — allow one probe call
         return True
 
     def status(self) -> dict:

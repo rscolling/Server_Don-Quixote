@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import logging
 import re
+import time
 import uuid
 from datetime import datetime, timezone
 from io import BytesIO
@@ -11,6 +12,7 @@ from io import BytesIO
 import chromadb
 import httpx
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from deepgram import DeepgramClient, LiveTranscriptionEvents, LiveOptions
@@ -25,6 +27,19 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("bob-voice")
 
 app = FastAPI(title="BOB Voice Bridge")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://voice.appalachiantoysgames.com",
+        "https://appalachiantoysgames.com",
+        "https://www.appalachiantoysgames.com",
+        "http://192.168.1.228:8150",
+        "http://localhost:8150",
+    ],
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
 
 BOB_URL = os.getenv("BOB_URL", "http://localhost:8100")
 DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY")
@@ -332,6 +347,11 @@ async def stream_bob_and_speak(message: str, thread_id: str, ws: WebSocket,
     return full_text
 
 
+# Per-session rate limit: max messages per minute
+WS_RATE_LIMIT = int(os.getenv("WS_RATE_LIMIT_PER_MIN", "10"))
+WS_GUEST_RATE_LIMIT = int(os.getenv("WS_GUEST_RATE_LIMIT_PER_MIN", "5"))
+
+
 @app.websocket("/ws/voice")
 async def voice_endpoint(ws: WebSocket):
     await ws.accept()
@@ -344,6 +364,10 @@ async def voice_endpoint(ws: WebSocket):
     stop_event = asyncio.Event()
     msg_queue = asyncio.Queue()
     user_context = _build_user_context(user)
+
+    # Per-session rate limiting
+    rate_limit = WS_RATE_LIMIT if user.role != UserRole.GUEST else WS_GUEST_RATE_LIMIT
+    message_timestamps: list[float] = []
 
     logger.info(f"Voice session started: {thread_id} | user: {user.display_name} ({user.role.value})")
 
@@ -386,6 +410,18 @@ async def voice_endpoint(ws: WebSocket):
                 break
 
             if "bytes" in data:
+                # Rate limiting
+                now_ts = time.time()
+                message_timestamps.append(now_ts)
+                cutoff = now_ts - 60
+                message_timestamps[:] = [t for t in message_timestamps if t > cutoff]
+                if len(message_timestamps) > rate_limit:
+                    await ws.send_json({
+                        "type": "status",
+                        "message": "Slow down — too many messages. Try again in a moment."
+                    })
+                    continue
+
                 audio_data = data["bytes"]
                 logger.info(f"Received {len(audio_data)} bytes of audio from {user.display_name}")
 

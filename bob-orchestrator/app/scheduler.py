@@ -16,7 +16,7 @@ from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR, EVENT_JOB_MI
 
 logger = logging.getLogger("bob.scheduler")
 
-SCHEDULER_DB = os.getenv("SCHEDULER_DB_PATH", "sqlite:////app/data/scheduler_jobs.db")
+from app.config import SCHEDULER_DB_PATH as SCHEDULER_DB, SCHEDULER_TIMEZONE
 
 # ── Default recurring tasks ──────────────────────────────────────────────────
 
@@ -94,7 +94,7 @@ def get_scheduler() -> AsyncIOScheduler:
         jobstores = {
             "default": SQLAlchemyJobStore(url=SCHEDULER_DB)
         }
-        _scheduler = AsyncIOScheduler(jobstores=jobstores, timezone="America/New_York")
+        _scheduler = AsyncIOScheduler(jobstores=jobstores, timezone=SCHEDULER_TIMEZONE)
 
         def _on_event(event):
             if event.exception:

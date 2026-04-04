@@ -20,7 +20,7 @@ MAX_RETRIES = 3
 RETRY_BACKOFF = [1, 3, 8]  # seconds between retries
 
 # Offline queue
-QUEUE_DB_PATH = os.getenv("BUS_QUEUE_DB_PATH", "/app/data/bus-queue.db")
+from app.config import BUS_QUEUE_DB_PATH as QUEUE_DB_PATH
 QUEUE_DRAIN_INTERVAL = 30  # seconds between drain attempts
 _drain_task = None
 

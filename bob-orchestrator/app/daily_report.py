@@ -131,6 +131,30 @@ async def compose_daily_report() -> str:
 
     lines.append("")
 
+    # ── Recovery Status ─────────────────────────────────────────────────────
+    lines.append("## Recovery")
+    try:
+        from app.recovery import get_paused_summary
+        lines.append(f"  {get_paused_summary()}")
+    except Exception:
+        lines.append("  Recovery monitor: unavailable")
+
+    try:
+        from app.circuit_breaker import all_status
+        breakers = all_status()
+        open_breakers = [
+            f"{b['name']} ({b['state']})"
+            for b in breakers if b["state"] != "closed"
+        ]
+        if open_breakers:
+            lines.append(f"  Circuit breakers open: {', '.join(open_breakers)}")
+        else:
+            lines.append("  Circuit breakers: all normal")
+    except Exception:
+        pass
+
+    lines.append("")
+
     # ── Scheduled Jobs ──────────────────────────────────────────────────────
     lines.append("## Upcoming Scheduled Tasks")
     try:

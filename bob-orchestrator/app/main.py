@@ -17,11 +17,12 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from app.graph import build_graph, get_langfuse_handler
 from app.memory import init_collections
-from app.config import CHECKPOINT_DB_PATH
+from app.config import CHECKPOINT_DB_PATH, CORS_ORIGINS, validate_config
 from app import bus_client
 
+from app.logging_config import setup_logging
+setup_logging()
 logger = logging.getLogger("bob")
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
 
 _start_time = time.time()
 _graph = None
@@ -43,6 +44,13 @@ async def _ntfy_send(topic: str, title: str, message: str, priority: str = "defa
 async def lifespan(app: FastAPI):
     global _graph
     logger.info("BOB is waking up...")
+
+    # Validate config
+    config_errors = validate_config()
+    if config_errors:
+        for err in config_errors:
+            logger.error(f"Config error: {err}")
+        raise RuntimeError(f"BOB cannot start: {', '.join(config_errors)}")
 
     # Init ChromaDB collections and seed baseline data
     try:
@@ -125,6 +133,17 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"ElevenLabs monitor not started: {e}")
 
+    # Start recovery monitor (auto-resumes paused tasks)
+    try:
+        from app.recovery import recovery_monitor_loop
+        from app.recovery import set_notify_callback as set_recovery_notify
+
+        set_recovery_notify(_ntfy_send)
+        asyncio.create_task(recovery_monitor_loop())
+        logger.info("Recovery monitor started")
+    except Exception as e:
+        logger.warning(f"Recovery monitor not started: {e}")
+
     yield
 
     logger.info("BOB is shutting down.")
@@ -134,15 +153,7 @@ app = FastAPI(title="BOB — Bound Operational Brain", version="1.0.0", lifespan
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://appalachiantoysgames.com",
-        "https://www.appalachiantoysgames.com",
-        "https://voice.appalachiantoysgames.com",
-        "https://bob.appalachiantoysgames.com",
-        "http://192.168.1.228:8100",   # LAN dashboard
-        "http://192.168.1.228:8200",   # LAN dashboard
-        "http://localhost:8100",
-    ],
+    allow_origins=CORS_ORIGINS,
     allow_methods=["GET", "POST", "PATCH"],
     allow_headers=["*"],
 )
@@ -266,6 +277,61 @@ async def chat(req: ChatRequest, request: Request):
     )
 
 
+# ── Memory proposal endpoints ──────────────────────────────────────────────
+
+@app.get("/proposals/pending")
+async def proposals_pending():
+    """List pending memory proposals."""
+    from app.memory_proposals import get_pending
+    return {"proposals": get_pending()}
+
+
+@app.post("/proposals/{proposal_id}/approve")
+async def proposal_approve(proposal_id: str, note: str = ""):
+    """Approve a memory proposal via API."""
+    from app.memory_proposals import approve
+    result = approve(proposal_id, reviewed_by="Rob (API)", note=note)
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result
+
+
+@app.post("/proposals/{proposal_id}/reject")
+async def proposal_reject(proposal_id: str, note: str = ""):
+    """Reject a memory proposal via API."""
+    from app.memory_proposals import reject
+    result = reject(proposal_id, reviewed_by="Rob (API)", note=note)
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result
+
+
+@app.get("/proposals/history")
+async def proposals_history(limit: int = 20):
+    """Recent proposal history."""
+    from app.memory_proposals import get_history
+    return {"proposals": get_history(limit)}
+
+
+# ── Recovery endpoints ─────────────────────────────────────────────────────
+
+@app.get("/recovery/paused")
+async def get_paused_tasks():
+    """List all tasks paused waiting for service recovery."""
+    from app.recovery import get_paused_tasks as _get_paused
+    return {"paused_tasks": _get_paused()}
+
+
+@app.post("/recovery/dismiss/{task_id}")
+async def dismiss_paused(task_id: str):
+    """Manually dismiss a paused task."""
+    from app.recovery import remove_paused_task
+    removed = remove_paused_task(task_id)
+    if not removed:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return {"status": "dismissed", "task_id": task_id}
+
+
 @app.get("/status")
 async def status():
     """Full system status — what BOB sees."""
@@ -279,11 +345,19 @@ async def status():
     except Exception:
         agents = {"error": "message bus unreachable"}
 
+    paused = []
+    try:
+        from app.recovery import get_paused_tasks as _get_paused
+        paused = _get_paused()
+    except Exception:
+        pass
+
     return {
         "bob": {
             "status": "online" if _graph else "starting",
             "uptime_seconds": int(time.time() - _start_time),
             "bus_queue_depth": bus_client.get_queue_depth(),
+            "paused_tasks": len(paused),
         },
         "message_bus": stats,
         "agents": agents,

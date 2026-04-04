@@ -104,15 +104,21 @@ def recall_all(collection: str) -> str:
 async def notify_rob(topic: str, title: str, message: str, priority: str = "default") -> str:
     """Send a push notification to Rob's phone via ntfy. Topics: bob-critical (urgent), bob-reviews (high), bob-status (default), bob-daily (low). Priority: min, low, default, high, urgent."""
     import os
-    import httpx
+    from app.retry import with_retry
+
     ntfy_url = os.getenv("NTFY_URL", "http://ntfy:80")
     ntfy_token = os.getenv("NTFY_TOKEN", "")
     headers = {"Title": title, "Priority": priority}
     if ntfy_token:
         headers["Authorization"] = f"Bearer {ntfy_token}"
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(f"{ntfy_url}/{topic}", content=message, headers=headers)
-        resp.raise_for_status()
+
+    @with_retry(service="default", task_id="notify_rob")
+    async def _send():
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(f"{ntfy_url}/{topic}", content=message, headers=headers)
+            resp.raise_for_status()
+
+    await _send()
     return f"Notification sent to {topic}: {title}"
 
 
@@ -168,6 +174,54 @@ async def check_email() -> str:
     if not emails:
         return "No new unread emails."
     return json.dumps(emails)
+
+
+@tool
+async def delegate_task(
+    title: str,
+    description: str,
+    team: str = "",
+    priority: str = "normal",
+    deadline: str = "",
+    constraints: str = "",
+    deliverables: str = "",
+) -> str:
+    """Delegate a task to an agent team with an auto-generated structured brief. This is the preferred way to assign work — it pulls brand guidelines, relevant context from memory, and standing orders automatically.
+
+    team: PM, Marketing, Engineering, Research, or empty for unassigned.
+    constraints: comma-separated list of constraints (optional).
+    deliverables: comma-separated list of expected deliverables (optional).
+    deadline: date string like '2026-04-10' (optional).
+    """
+    from app.briefing import generate_brief, format_brief_as_text
+
+    constraint_list = [c.strip() for c in constraints.split(",") if c.strip()] if constraints else None
+    deliverable_list = [d.strip() for d in deliverables.split(",") if d.strip()] if deliverables else None
+
+    brief = generate_brief(
+        title=title,
+        description=description,
+        team=team,
+        priority=priority,
+        deadline=deadline,
+        constraints=constraint_list,
+        deliverables=deliverable_list,
+    )
+
+    brief_text = format_brief_as_text(brief)
+
+    result = await bus_client.create_task(
+        title=title,
+        description=brief_text,
+        assignee=team or None,
+        priority=priority,
+        metadata={"brief": brief},
+    )
+    return json.dumps({
+        "status": "delegated",
+        "task": result,
+        "brief_summary": f"Brief generated with {len(brief.get('context', []))} context items, brand guidelines included.",
+    })
 
 
 @tool
@@ -307,6 +361,73 @@ async def check_voice_usage() -> str:
 
 
 @tool
+def propose_memory(collection: str, doc_id: str, text: str,
+                   proposed_by: str = "", reason: str = "",
+                   metadata_json: str = "{}") -> str:
+    """Propose a write to shared memory for BOB's review. Agent teams should use this instead of remember() for important shared knowledge. Collections: brand_voice, decisions, research, product_specs, project_context."""
+    from app.memory_proposals import propose
+    metadata = json.loads(metadata_json)
+    result = propose(
+        collection=collection,
+        doc_id=doc_id,
+        text=text,
+        metadata=metadata,
+        proposed_by=proposed_by,
+        reason=reason,
+    )
+    return json.dumps(result)
+
+
+@tool
+def review_pending_proposals() -> str:
+    """List all pending memory proposals awaiting BOB's review."""
+    from app.memory_proposals import get_pending
+    pending = get_pending()
+    if not pending:
+        return json.dumps({"pending": [], "message": "No pending proposals."})
+    # Trim text for readability
+    for p in pending:
+        if len(p.get("text", "")) > 200:
+            p["text_preview"] = p["text"][:200] + "..."
+            del p["text"]
+    return json.dumps({"pending": pending, "count": len(pending)})
+
+
+@tool
+def approve_proposal(proposal_id: str, note: str = "") -> str:
+    """Approve a memory proposal — commits the data to ChromaDB shared memory."""
+    from app.memory_proposals import approve
+    return json.dumps(approve(proposal_id, reviewed_by="BOB", note=note))
+
+
+@tool
+def reject_proposal(proposal_id: str, note: str = "") -> str:
+    """Reject a memory proposal — data is discarded, not written to shared memory."""
+    from app.memory_proposals import reject
+    return json.dumps(reject(proposal_id, reviewed_by="BOB", note=note))
+
+
+@tool
+def check_paused_tasks() -> str:
+    """Check if any tasks are paused waiting for service recovery. Shows task ID, reason, what service it's waiting for, and retry count."""
+    from app.recovery import get_paused_tasks
+    tasks = get_paused_tasks()
+    if not tasks:
+        return json.dumps({"paused_tasks": [], "message": "No paused tasks."})
+    return json.dumps({"paused_tasks": tasks, "count": len(tasks)})
+
+
+@tool
+def dismiss_paused_task(task_id: str) -> str:
+    """Manually remove a paused task from the recovery queue. Use when a task is no longer needed or Rob wants to cancel it."""
+    from app.recovery import remove_paused_task
+    removed = remove_paused_task(task_id)
+    if removed:
+        return json.dumps({"status": "dismissed", "task_id": task_id})
+    return json.dumps({"status": "not_found", "task_id": task_id})
+
+
+@tool
 async def check_confirmation(confirmation_id: str) -> str:
     """Check the status of a HIGH-risk tool confirmation. Use this after a tool was blocked pending Rob's approval. Returns: approved, rejected, expired, or pending."""
     from app.firewall import _pending
@@ -390,10 +511,17 @@ _TOOLS = [
     email_archive,
     email_add_label,
     email_list_labels,
+    propose_memory,
+    review_pending_proposals,
+    approve_proposal,
+    reject_proposal,
+    check_paused_tasks,
+    dismiss_paused_task,
+    delegate_task,
     add_scheduled_job,
     remove_scheduled_job,
     trigger_job_now,
     generate_daily_briefing,
 ]
 
-ALL_TOOLS = [_firewall_wrap(t) for t in _TOOLS] + [check_confirmation]
+ALL_TOOLS = [_firewall_wrap(t) for t in _TOOLS + [check_confirmation]]

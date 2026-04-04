@@ -114,21 +114,13 @@ async def identify_user(headers: dict) -> UserIdentity:
     if not token:
         return GUEST
 
-    # If CF_TEAM_NAME not configured, try to decode without validation (dev mode)
+    # If CF_TEAM_NAME not configured, reject all JWTs — no unvalidated tokens
     if not CF_TEAM_NAME:
-        try:
-            payload = jwt.decode(token, options={"verify_signature": False})
-            email = payload.get("email", "").lower()
-            role = UserRole.ROB if email in ROB_EMAILS else UserRole.MEMBER
-            return UserIdentity(
-                role=role,
-                email=email,
-                name=payload.get("name"),
-                user_id=payload.get("sub"),
-            )
-        except Exception as e:
-            logger.warning(f"JWT decode failed (no validation): {e}")
-            return GUEST
+        logger.error(
+            "CF_TEAM_NAME not set — cannot validate JWT. "
+            "All users treated as GUEST until Cloudflare Access is configured."
+        )
+        return GUEST
 
     # Full validation with CF public keys
     try:
