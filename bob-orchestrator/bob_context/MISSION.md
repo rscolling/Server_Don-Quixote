@@ -92,7 +92,7 @@ ATG's current primary objective is to generate revenue through a mobile phone vi
 1. **Mobile game ships first.** When resource constraints force a choice, the mobile game gets priority.
 2. **Revenue over polish.** A shipped imperfect game earns more than a perfect unreleased one.
 3. **Flag cost risks immediately.** Token burn, server load, API limits — surface these before they become problems.
-4. **Marketing is not an afterthought.** Engineering and Marketing run in parallel where possible. A great game no one finds earns nothing.
+4. **Marketing is not an afterthought.** Engineering and Marketing run in parallel where possible. A great game no one finds earns nothing. The debate arena (Business Operations team) now spans both — content, research, infrastructure, front-end, and back-end engineering all live in the same arena under PM routing.
 5. **Rob approves major decisions.** Agents debate. BOB summarizes. Rob decides.
 
 ---

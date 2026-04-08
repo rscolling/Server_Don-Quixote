@@ -71,6 +71,17 @@ TOOL_REGISTRY = {
     "list_scheduled_jobs": RiskLevel.LOW,
     "pause_scheduled_job": RiskLevel.MEDIUM,
     "resume_scheduled_job": RiskLevel.MEDIUM,
+    "analyze_photo": RiskLevel.MEDIUM,
+    "list_recent_photos": RiskLevel.LOW,
+    "upload_photo": RiskLevel.MEDIUM,
+    "get_weather": RiskLevel.LOW,
+    "search_web": RiskLevel.LOW,
+    # Promotion gate tools (added 2026-04-08)
+    "list_pending_promotions": RiskLevel.LOW,
+    "get_promotion_details": RiskLevel.LOW,
+    "get_promotion_diff": RiskLevel.LOW,
+    "approve_promotion": RiskLevel.HIGH,
+    "reject_promotion": RiskLevel.MEDIUM,
 
     # HIGH-risk tools — require Rob's confirmation before execution
     # Uncomment as BOB gains these capabilities:
@@ -159,6 +170,39 @@ def confirm(confirmation_id: str) -> PendingConfirmation | None:
     return conf
 
 
+
+
+def find_approved_confirmation(tool_name: str, params: dict):
+    """Return an approved (non-expired) confirmation matching this exact (tool, params).
+
+    Used by the HIGH-risk gate to honor a prior approval instead of queueing a fresh
+    confirmation on every retry. Match is by tool name + canonical-JSON of params.
+    Once consumed, the entry is marked 'consumed' so it cannot be replayed.
+    """
+    try:
+        target_key = json.dumps(params, sort_keys=True, default=str)
+    except Exception:
+        target_key = str(params)
+    for conf in list(_pending.values()):
+        if conf.tool_name != tool_name:
+            continue
+        if conf.status != 'approved':
+            continue
+        if conf.is_expired:
+            continue
+        try:
+            existing_key = json.dumps(conf.params, sort_keys=True, default=str)
+        except Exception:
+            existing_key = str(conf.params)
+        if existing_key == target_key:
+            return conf
+    return None
+
+
+def consume_confirmation(conf):
+    """Mark an approved confirmation as consumed so it can't be replayed."""
+    conf.status = 'consumed'
+
 def reject(confirmation_id: str) -> PendingConfirmation | None:
     conf = _pending.get(confirmation_id)
     if conf:
@@ -212,8 +256,45 @@ def _rotate_audit_log():
         logger.error(f"Audit log rotation failed: {e}")
 
 
-def write_audit(event: str, tool: str, risk: str, details: dict | None = None):
-    """Append one JSON line to the audit log. Auto-rotates at max size."""
+# Keys whose values must NEVER be written to the audit log
+_SECRET_PARAM_KEYS = {
+    "api_key", "apikey", "token", "secret", "password", "passwd",
+    "credential", "credentials", "auth", "authorization",
+    "private_key", "client_secret", "access_token",
+}
+
+
+def _sanitize_params(params: dict | None) -> dict | None:
+    """Strip secret-shaped keys before audit logging."""
+    if not params:
+        return params
+    safe = {}
+    for k, v in params.items():
+        if any(s in k.lower() for s in _SECRET_PARAM_KEYS):
+            safe[k] = "[REDACTED]"
+        elif isinstance(v, dict):
+            safe[k] = _sanitize_params(v)
+        elif isinstance(v, str) and len(v) > 2000:
+            # Truncate very long strings to keep the audit log manageable
+            safe[k] = v[:2000] + f"...[truncated {len(v)} bytes]"
+        else:
+            safe[k] = v
+    return safe
+
+
+def write_audit(event: str, tool: str, risk: str, details: dict | None = None,
+                params: dict | None = None):
+    """Append one JSON line to the audit log. Auto-rotates at max size.
+
+    Args:
+        event:   The decision (allow, allow_medium, deny_injection, etc.)
+        tool:    The tool name
+        risk:    The risk level
+        details: Free-form structured info (loop signal, confirmation id, etc.)
+        params:  The actual parameters the tool was called with. Stored
+                 sanitized (secrets redacted, long values truncated) so the
+                 replay tool can deterministically re-run a past call.
+    """
     entry = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "event": event,
@@ -223,6 +304,8 @@ def write_audit(event: str, tool: str, risk: str, details: dict | None = None):
     }
     if details:
         entry["details"] = details
+    if params is not None:
+        entry["params"] = _sanitize_params(params)
     try:
         Path(AUDIT_LOG_PATH).parent.mkdir(parents=True, exist_ok=True)
         _rotate_audit_log()
@@ -238,6 +321,7 @@ class FirewallDecision(Enum):
     ALLOW = "allow"
     PENDING = "pending"
     DENY_INJECTION = "deny_injection"
+    DENY_LOOP = "deny_loop"
 
 
 @dataclass
@@ -247,14 +331,16 @@ class FirewallResult:
     risk: RiskLevel | None
     reason: str = ""
     confirmation_id: str | None = None
+    loop_signal: dict | None = None
 
 
-def gate(tool_name: str, params: dict) -> FirewallResult:
+def gate(tool_name: str, params: dict, thread_id: str = "default") -> FirewallResult:
     """
     Main firewall gate. Call before executing any tool.
 
     Returns FirewallResult. Only execute if decision == ALLOW.
     For PENDING, notify Rob and wait for confirmation.
+    For DENY_LOOP, the loop detector tripped — abort the run.
     """
     risk = TOOL_REGISTRY.get(tool_name)
 
@@ -265,7 +351,8 @@ def gate(tool_name: str, params: dict) -> FirewallResult:
     # Scan for injection
     injection = scan_for_injection(params)
     if injection:
-        write_audit("deny_injection", tool_name, risk.value, {"pattern": injection})
+        write_audit("deny_injection", tool_name, risk.value,
+                    {"pattern": injection}, params=params)
         logger.warning(f"INJECTION BLOCKED: {tool_name} — {injection}")
         return FirewallResult(
             decision=FirewallDecision.DENY_INJECTION,
@@ -274,24 +361,53 @@ def gate(tool_name: str, params: dict) -> FirewallResult:
             reason=f"Prompt injection detected: {injection}",
         )
 
-    # LOW — execute, log quietly
+    # Loop detection — deterministic, not vibes-based
+    try:
+        from app import loop_detector
+        args_signature = json.dumps(params, sort_keys=True, default=str)[:500]
+        loop_signal = loop_detector.record_tool_call(thread_id, tool_name, args_signature)
+        if loop_signal:
+            write_audit("deny_loop", tool_name, risk.value, loop_signal, params=params)
+            logger.error(f"LOOP DETECTED: {tool_name} — {loop_signal['details']}")
+            return FirewallResult(
+                decision=FirewallDecision.DENY_LOOP,
+                tool_name=tool_name,
+                risk=risk,
+                reason=loop_signal["details"],
+                loop_signal=loop_signal,
+            )
+    except Exception as e:
+        logger.warning(f"Loop detector error (non-fatal): {e}")
+
+    # LOW — execute, log quietly (params recorded for replay)
     if risk == RiskLevel.LOW:
-        write_audit("allow", tool_name, risk.value)
+        write_audit("allow", tool_name, risk.value, params=params)
         return FirewallResult(decision=FirewallDecision.ALLOW, tool_name=tool_name, risk=risk)
 
-    # MEDIUM — execute, log prominently
+    # MEDIUM — execute, log prominently (params recorded for replay)
     if risk == RiskLevel.MEDIUM:
-        write_audit("allow_medium", tool_name, risk.value, {"params_keys": list(params.keys())})
+        write_audit("allow_medium", tool_name, risk.value,
+                    {"params_keys": list(params.keys())}, params=params)
         logger.info(f"MEDIUM tool executed: {tool_name}")
         return FirewallResult(decision=FirewallDecision.ALLOW, tool_name=tool_name, risk=risk)
 
-    # HIGH — queue for confirmation
+    # HIGH — queue for confirmation, unless an approved confirmation already exists
     if risk == RiskLevel.HIGH:
+        prior = find_approved_confirmation(tool_name, params)
+        if prior is not None:
+            consume_confirmation(prior)
+            write_audit('allow_confirmed', tool_name, risk.value, {
+                'confirmation_id': prior.confirmation_id,
+                'consumed': True,
+            }, params=params)
+            logger.warning(f'HIGH tool executed via prior confirmation: {tool_name} '
+                           f'(confirmation_id={prior.confirmation_id})')
+            return FirewallResult(decision=FirewallDecision.ALLOW, tool_name=tool_name, risk=risk)
         conf = queue_confirmation(tool_name, params)
         write_audit("pending_confirmation", tool_name, risk.value, {
             "confirmation_id": conf.confirmation_id,
             "timeout_seconds": conf.timeout_seconds,
-        })
+        }, params=params)
         logger.warning(f"HIGH tool queued: {tool_name} — confirmation_id={conf.confirmation_id}")
         return FirewallResult(
             decision=FirewallDecision.PENDING,

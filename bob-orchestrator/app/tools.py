@@ -3,6 +3,7 @@
 import asyncio
 import json
 import functools
+import os
 import inspect
 import logging
 from datetime import datetime, timezone
@@ -459,6 +460,17 @@ def _firewall_wrap(tool_fn):
             result = gate(tool_fn.name, kwargs)
             if result.decision == FirewallDecision.DENY_INJECTION:
                 return json.dumps({"error": "BLOCKED", "reason": result.reason})
+            if result.decision == FirewallDecision.DENY_LOOP:
+                return json.dumps({
+                    "error": "LOOP_DETECTED",
+                    "reason": result.reason,
+                    "loop_signal": result.loop_signal,
+                    "instruction": (
+                        "STOP. You are in a loop. Do not retry this tool. "
+                        "Either change your approach entirely or escalate to Rob "
+                        "and explain what you were trying to do and why it didn't work."
+                    ),
+                })
             if result.decision == FirewallDecision.PENDING:
                 return json.dumps({
                     "status": "BLOCKED_PENDING_CONFIRMATION",
@@ -474,6 +486,16 @@ def _firewall_wrap(tool_fn):
             result = gate(tool_fn.name, kwargs)
             if result.decision == FirewallDecision.DENY_INJECTION:
                 return json.dumps({"error": "BLOCKED", "reason": result.reason})
+            if result.decision == FirewallDecision.DENY_LOOP:
+                return json.dumps({
+                    "error": "LOOP_DETECTED",
+                    "reason": result.reason,
+                    "loop_signal": result.loop_signal,
+                    "instruction": (
+                        "STOP. You are in a loop. Do not retry this tool. "
+                        "Either change your approach entirely or escalate to Rob."
+                    ),
+                })
             if result.decision == FirewallDecision.PENDING:
                 return json.dumps({
                     "status": "BLOCKED_PENDING_CONFIRMATION",
@@ -485,6 +507,282 @@ def _firewall_wrap(tool_fn):
         tool_fn.func = wrapper
 
     return tool_fn
+
+
+@tool
+async def get_weather(location: str) -> str:
+    """Get current weather and a 3-day forecast for a location.
+
+    Uses Open-Meteo (free, no API key). Pass a place name like 'Asheville NC',
+    'Boone, NC', 'Raleigh', etc. Returns temperature, conditions, wind, and a
+    short forecast. Use this when the user asks about weather, forecast,
+    "is it going to rain", outdoor conditions, etc.
+    """
+    try:
+        # Open-Meteo geocoding rejects commas, so use just the city portion
+        # for the lookup but keep the original for display fallback.
+        lookup_name = location.split(",")[0].strip()
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            geo = await client.get(
+                "https://geocoding-api.open-meteo.com/v1/search",
+                params={"name": lookup_name, "count": 1, "language": "en", "format": "json"},
+            )
+            geo.raise_for_status()
+            geo_data = geo.json()
+            results = geo_data.get("results") or []
+            if not results:
+                return json.dumps({"error": f"Location not found: {location}"})
+            place = results[0]
+            lat, lon = place["latitude"], place["longitude"]
+            display = f"{place.get('name','')}, {place.get('admin1','')}, {place.get('country_code','')}".strip(", ")
+
+            wx = await client.get(
+                "https://api.open-meteo.com/v1/forecast",
+                params={
+                    "latitude": lat,
+                    "longitude": lon,
+                    "current": "temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,wind_speed_10m,wind_direction_10m",
+                    "daily": "weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max",
+                    "timezone": "auto",
+                    "temperature_unit": "fahrenheit",
+                    "wind_speed_unit": "mph",
+                    "precipitation_unit": "inch",
+                    "forecast_days": 3,
+                },
+            )
+            wx.raise_for_status()
+            data = wx.json()
+
+        # WMO weather code → human label
+        codes = {
+            0: "clear", 1: "mainly clear", 2: "partly cloudy", 3: "overcast",
+            45: "fog", 48: "rime fog", 51: "light drizzle", 53: "drizzle",
+            55: "heavy drizzle", 61: "light rain", 63: "rain", 65: "heavy rain",
+            71: "light snow", 73: "snow", 75: "heavy snow", 80: "rain showers",
+            81: "heavy showers", 82: "violent showers", 95: "thunderstorm",
+            96: "thunderstorm w/ hail", 99: "severe thunderstorm w/ hail",
+        }
+        cur = data.get("current", {})
+        daily = data.get("daily", {})
+        forecast = []
+        for i, day in enumerate(daily.get("time", [])):
+            forecast.append({
+                "date": day,
+                "high_f": daily["temperature_2m_max"][i],
+                "low_f": daily["temperature_2m_min"][i],
+                "conditions": codes.get(daily["weather_code"][i], f"code {daily['weather_code'][i]}"),
+                "precip_chance_pct": daily["precipitation_probability_max"][i],
+                "precip_inches": daily["precipitation_sum"][i],
+                "max_wind_mph": daily["wind_speed_10m_max"][i],
+            })
+        return json.dumps({
+            "location": display,
+            "current": {
+                "temp_f": cur.get("temperature_2m"),
+                "feels_like_f": cur.get("apparent_temperature"),
+                "humidity_pct": cur.get("relative_humidity_2m"),
+                "conditions": codes.get(cur.get("weather_code"), "?"),
+                "wind_mph": cur.get("wind_speed_10m"),
+                "is_day": bool(cur.get("is_day")),
+            },
+            "forecast": forecast,
+        })
+    except Exception as e:
+        logger.exception("get_weather failed")
+        return json.dumps({"error": str(e), "location": location})
+
+
+@tool
+async def search_web(query: str, max_results: int = 5) -> str:
+    """Search the live internet for current information.
+
+    Uses DuckDuckGo (free, no API key). Returns up to max_results search results
+    with title, URL, and snippet. Use this when the user asks about current events,
+    recent news, real-time facts, anything that needs the live web. Do NOT use
+    this for things you already know from training — only for things that need
+    fresh information.
+    """
+    try:
+        from ddgs import DDGS
+
+        def _search():
+            with DDGS() as ddgs:
+                return list(ddgs.text(query, max_results=max_results))
+
+        results = await asyncio.to_thread(_search)
+        cleaned = [
+            {
+                "title": r.get("title", ""),
+                "url": r.get("href", ""),
+                "snippet": r.get("body", "")[:400],
+            }
+            for r in (results or [])
+        ]
+        return json.dumps({"query": query, "results": cleaned, "count": len(cleaned)})
+    except Exception as e:
+        logger.exception("search_web failed")
+        return json.dumps({"error": str(e), "query": query})
+
+
+@tool
+async def analyze_photo(photo_id: str, question: str) -> str:
+    """Re-run vision on a previously remembered photo with a new question.
+    Use this when the user says "look at the photo I uploaded" or asks a
+    follow-up about an image. The photo must have been persisted via
+    'remember this' — temp uploads are auto-purged after 60 seconds.
+    """
+    from app import photo_intake
+    try:
+        result = await photo_intake.analyze_existing(photo_id, question, user="rob")
+        return json.dumps({"photo_id": photo_id, "answer": result["text"],
+                          "cost_usd": result["cost_usd"]})
+    except Exception as e:
+        return json.dumps({"error": str(e), "photo_id": photo_id})
+
+
+@tool
+async def list_recent_photos(limit: int = 10) -> str:
+    """List recent photos that were uploaded and remembered. Returns photo IDs,
+    upload mode, analysis previews, and timestamps. Use the photo_id with
+    analyze_photo to ask follow-up questions about a specific image.
+    """
+    from app import photo_intake
+    photos = photo_intake.list_recent(user=None, limit=limit, only_persisted=True)
+    return json.dumps(photos)
+
+
+
+# ─────────────────────────── Promotion Gate Tools ────────────────────────────
+# Surface the atg-promotion-gate service through BOB chat. Agents (FE/BE) write
+# files into proposals/. Rob (or BOB on his behalf) reviews and approves before
+# anything lands in the live target tree.
+PROMOTION_GATE_URL = os.environ.get("PROMOTION_GATE_URL", "http://promotion-gate:8112")
+PROMOTION_GATE_TIMEOUT = 15.0
+
+
+async def _promotion_get(path: str, params: dict | None = None) -> dict:
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=PROMOTION_GATE_TIMEOUT) as client:
+            r = await client.get(f"{PROMOTION_GATE_URL}{path}", params=params or {})
+            r.raise_for_status()
+            return r.json()
+    except Exception as e:
+        return {"error": f"promotion-gate GET {path} failed: {e}"}
+
+
+async def _promotion_post(path: str, body: dict) -> dict:
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=PROMOTION_GATE_TIMEOUT) as client:
+            r = await client.post(f"{PROMOTION_GATE_URL}{path}", json=body)
+            r.raise_for_status()
+            return r.json()
+    except Exception as e:
+        return {"error": f"promotion-gate POST {path} failed: {e}"}
+
+
+@tool
+async def list_pending_promotions() -> str:
+    """List all pending file promotions waiting for Rob's approval.
+
+    Returns each promotion's id, source path (under /agent-share/workspace/*/proposals/),
+    target path (the live destination), the agent that requested it, the reason, and
+    when it was created. Use this when Rob asks "what's waiting for me?" or
+    "any pending promotions?". This is a READ-ONLY operation — it does not change anything.
+    """
+    data = await _promotion_get("/promotions", params={"state": "pending", "limit": 50})
+    if "error" in data:
+        return json.dumps(data)
+    out = []
+    for p in data.get("promotions", []):
+        out.append({
+            "id": p.get("id"),
+            "agent": p.get("agent"),
+            "source": p.get("source_path"),
+            "target": p.get("target_path"),
+            "reason": (p.get("reason") or "")[:200],
+            "task_id": p.get("task_id"),
+            "created_at": p.get("created_at"),
+        })
+    return json.dumps({"count": len(out), "pending": out})
+
+
+@tool
+async def get_promotion_details(promotion_id: int) -> str:
+    """Get the full record for a single promotion by id, including state and timestamps.
+
+    Use this when Rob references a promotion by id and wants more context (who requested it,
+    when, what state it is in, who decided it, what the resolution note said). This is
+    READ-ONLY — it does not change anything.
+    """
+    data = await _promotion_get(f"/promotions/{int(promotion_id)}")
+    return json.dumps(data)
+
+
+@tool
+async def get_promotion_diff(promotion_id: int) -> str:
+    """Get a unified diff preview of a pending promotion: source vs current target.
+
+    Walks both trees file by file. Returns a per-file summary (added / modified /
+    unchanged / removed_from_source / binary_skipped) plus the actual unified diff
+    text for modified files. Use this BEFORE approving anything so Rob can see what
+    will actually change. READ-ONLY.
+    """
+    data = await _promotion_get(f"/promotions/{int(promotion_id)}/diff")
+    if "error" in data:
+        return json.dumps(data)
+    # Slim the per-file diffs to summary + first 2 modified previews to keep
+    # the tool response readable. The full diffs live on the gate.
+    summary = data.get("summary", {})
+    diffs = data.get("diffs", [])
+    preview = []
+    modified_shown = 0
+    for d in diffs:
+        if d.get("kind") == "modified" and modified_shown < 2:
+            preview.append(d)
+            modified_shown += 1
+        elif d.get("kind") != "modified":
+            preview.append({"path": d.get("path"), "kind": d.get("kind")})
+    return json.dumps({
+        "id": data.get("id"),
+        "summary": summary,
+        "preview": preview,
+        "note": "Modified-file previews truncated to first 2; call promotion-gate /promotions/{id}/diff for full diffs.",
+    })
+
+
+@tool
+async def approve_promotion(promotion_id: int, note: str = "") -> str:
+    """APPROVE a pending promotion — this executes the actual file copy to the live target.
+
+    HIGH-risk operation. Files in the source tree are copied to the target tree
+    (e.g. ~/portfolio-site/built-different/). Once applied, the record is frozen
+    and there is NO automatic rollback — recovery requires manual git restore or
+    a fresh promotion overwriting the new files. Always call get_promotion_diff
+    first so you know exactly what will change. The note is recorded in the audit
+    trail.
+    """
+    data = await _promotion_post(
+        f"/promotions/{int(promotion_id)}/approve",
+        {"approver": "rob", "note": note or ""},
+    )
+    return json.dumps(data)
+
+
+@tool
+async def reject_promotion(promotion_id: int, note: str = "") -> str:
+    """REJECT a pending promotion — marks it rejected. No file copy happens.
+
+    Use this when a proposal is wrong, premature, or unwanted. The record is
+    frozen after rejection. The note is recorded in the audit trail and the
+    requesting agent can read it (eventually) to learn why.
+    """
+    data = await _promotion_post(
+        f"/promotions/{int(promotion_id)}/reject",
+        {"rejector": "rob", "note": note or ""},
+    )
+    return json.dumps(data)
 
 
 # All tools BOB has access to — wrapped with firewall gate
@@ -522,6 +820,43 @@ _TOOLS = [
     remove_scheduled_job,
     trigger_job_now,
     generate_daily_briefing,
+    analyze_photo,
+    list_recent_photos,
+    get_weather,
+    search_web,
+    list_pending_promotions,
+    get_promotion_details,
+    get_promotion_diff,
+    approve_promotion,
+    reject_promotion,
 ]
 
 ALL_TOOLS = [_firewall_wrap(t) for t in _TOOLS + [check_confirmation]]
+
+
+def wrap_mcp_tool(tool_fn):
+    """Wrap an MCP-fetched tool with the BOB firewall.
+
+    MCP tools come from external servers via langchain-mcp-adapters. They're
+    StructuredTool instances with the same .coroutine / .func interface as
+    native LangChain tools, so _firewall_wrap works on them directly.
+
+    We register MCP tools in the firewall TOOL_REGISTRY at MEDIUM risk by
+    default (write, recoverable, logged prominently). Operators can promote
+    specific MCP tools to HIGH risk by editing TOOL_REGISTRY in firewall.py
+    or by setting an env var (future enhancement).
+
+    Read-only MCP tools could in principle be marked LOW, but we default to
+    MEDIUM because we can't introspect side effects from the MCP schema alone.
+    """
+    from app.firewall import TOOL_REGISTRY, RiskLevel
+
+    name = getattr(tool_fn, "name", None)
+    if not name:
+        raise ValueError("MCP tool has no .name attribute")
+
+    if name not in TOOL_REGISTRY:
+        TOOL_REGISTRY[name] = RiskLevel.MEDIUM
+        logger.info(f"Registered MCP tool '{name}' with MEDIUM risk")
+
+    return _firewall_wrap(tool_fn)

@@ -6,9 +6,11 @@ services:
     env_file: .env
     environment:
       - PORT=8101
+      - POLL_INTERVAL=3
     volumes:
       - ~/agent-share:/agent-share
       - ./common:/common:ro
+      - chroma-cache:/root/.cache/chroma
     networks:
       - agent-net
     restart: unless-stopped
@@ -20,9 +22,11 @@ services:
     env_file: .env
     environment:
       - PORT=8102
+      - POLL_INTERVAL=10
     volumes:
       - ~/agent-share:/agent-share
       - ./common:/common:ro
+      - chroma-cache:/root/.cache/chroma
     networks:
       - agent-net
     restart: unless-stopped
@@ -34,9 +38,11 @@ services:
     env_file: .env
     environment:
       - PORT=8103
+      - POLL_INTERVAL=10
     volumes:
       - ~/agent-share:/agent-share
       - ./common:/common:ro
+      - chroma-cache:/root/.cache/chroma
     networks:
       - agent-net
     restart: unless-stopped
@@ -48,9 +54,163 @@ services:
     env_file: .env
     environment:
       - PORT=8104
+      - POLL_INTERVAL=10
     volumes:
       - ~/agent-share:/agent-share
       - ./common:/common:ro
+      - chroma-cache:/root/.cache/chroma
+    networks:
+      - agent-net
+    restart: unless-stopped
+
+  sys-engineer:
+    build:
+      context: ./agents/sys-engineer
+    container_name: atg-sys-engineer
+    env_file: .env
+    environment:
+      - PORT=8105
+      - POLL_INTERVAL=10
+    volumes:
+      - ~/agent-share:/agent-share
+      - ./common:/common:ro
+      - chroma-cache:/root/.cache/chroma
+      # Read-only source-of-truth config mounts. SE quotes these in its analyses.
+      - ~/debate-arena:/configs/debate-arena:ro
+      - ~/bob-orchestrator:/configs/bob-orchestrator:ro
+      # Single file mount — avoids exposing the credential JSON + cert.pem next to it.
+      - ~/.cloudflared/config.yml:/configs/cloudflared/config.yml:ro
+    networks:
+      - agent-net
+    restart: unless-stopped
+
+  reliability-engineer:
+    build:
+      context: ./agents/reliability-engineer
+    container_name: atg-reliability-engineer
+    env_file: .env
+    environment:
+      - PORT=8106
+      - POLL_INTERVAL=10
+    volumes:
+      - ~/agent-share:/agent-share
+      - ./common:/common:ro
+      - chroma-cache:/root/.cache/chroma
+    networks:
+      - agent-net
+    restart: unless-stopped
+
+  fe-engineer:
+    build:
+      context: ./agents/fe-engineer
+    container_name: atg-fe-engineer
+    env_file: .env
+    environment:
+      - PORT=8107
+      - POLL_INTERVAL=10
+    volumes:
+      - ~/agent-share:/agent-share
+      - ./common:/common:ro
+      - chroma-cache:/root/.cache/chroma
+      - ~/portfolio-site:/website-src:ro
+    networks:
+      - agent-net
+    restart: unless-stopped
+
+  be-engineer:
+    build:
+      context: ./agents/be-engineer
+    container_name: atg-be-engineer
+    env_file: .env
+    environment:
+      - PORT=8109
+      - POLL_INTERVAL=10
+    volumes:
+      - ~/agent-share:/agent-share
+      - ./common:/common:ro
+      - chroma-cache:/root/.cache/chroma
+      - ~/bob-orchestrator:/bob-src:ro
+      - ~/debate-arena:/debate-src:ro
+    networks:
+      - agent-net
+    restart: unless-stopped
+
+  code-sandbox:
+    build:
+      context: ./services/code-sandbox
+    container_name: atg-code-sandbox
+    environment:
+      - LOG_LEVEL=INFO
+    volumes:
+      - ~/agent-share:/agent-share:ro
+    networks:
+      - agent-net
+    restart: unless-stopped
+
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy:latest
+    container_name: atg-docker-proxy
+    environment:
+      # Allow only safe READ endpoints. Everything else (POST, EXEC, DELETE) is blocked.
+      - CONTAINERS=1
+      - IMAGES=1
+      - INFO=1
+      - NETWORKS=1
+      - VERSION=1
+      - POST=0
+      - EXEC=0
+      - DELETE=0
+      - BUILD=0
+      - COMMIT=0
+      - CONFIGS=0
+      - PLUGINS=0
+      - SECRETS=0
+      - SERVICES=0
+      - SESSION=0
+      - SWARM=0
+      - SYSTEM=0
+      - TASKS=0
+      - VOLUMES=0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - agent-net
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /run
+      - /tmp
+
+  host-metrics:
+    build:
+      context: ./services/host-metrics
+    container_name: atg-host-metrics
+    environment:
+      - DOCKER_PROXY_URL=http://docker-proxy:2375
+      - PROCFS_PATH=/host/proc
+    volumes:
+      # Read-only host /proc, /sys, and / for psutil and disk walking.
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/rootfs:ro
+    depends_on:
+      - docker-proxy
+    networks:
+      - agent-net
+    restart: unless-stopped
+
+  promotion-gate:
+    build:
+      context: ./services/promotion-gate
+    container_name: atg-promotion-gate
+    env_file: .env
+    environment:
+      - PROMOTION_TARGET_ROOTS=/promote-targets/portfolio-site
+      - PROMOTION_DB=/state/promotions.db
+    volumes:
+      - ~/agent-share:/agent-share:ro
+      - ~/portfolio-site:/promote-targets/portfolio-site
+      - promotion-state:/state
     networks:
       - agent-net
     restart: unless-stopped
@@ -58,3 +218,9 @@ services:
 networks:
   agent-net:
     external: true
+
+volumes:
+  promotion-state:
+    driver: local
+  chroma-cache:
+    driver: local

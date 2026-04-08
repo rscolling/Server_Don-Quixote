@@ -34,6 +34,11 @@ class MessageBusClient:
         r.raise_for_status()
         return r.json()
 
+    async def set_capabilities(self, shorthand: str, capabilities: list[dict]) -> list[dict]:
+        r = await self._client.post(f"/agents/{shorthand}/capabilities", json=capabilities)
+        r.raise_for_status()
+        return r.json()
+
     # --- Messages ---
 
     async def send_message(self, sender: str, recipient: str, message_type: str,

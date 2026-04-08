@@ -2,24 +2,51 @@
 
 import logging
 import os
-from langchain_anthropic import ChatAnthropic
 from langgraph.prebuilt import create_react_agent
-from app.config import (ANTHROPIC_API_KEY, BOB_MODEL, CONTEXT_DIR,
+from app.config import (CONTEXT_DIR, BOB_LLM_PROVIDER, BOB_MODEL,
+                        BOB_LLM_MAX_TOKENS, BOB_LLM_TEMPERATURE,
+                        BOB_LLM_BASE_URL, BOB_LLM_API_KEY,
                         LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_HOST)
+from app.llm import get_llm
 from app.tools import ALL_TOOLS
 
 logger = logging.getLogger("bob")
 
 
 def _load_context() -> str:
-    """Load all context files from bob_context/ into the system prompt."""
+    """Load context files from bob_context/ into the system prompt.
+
+    Personality is loaded first via the personality module (which respects
+    BOB_PERSONALITY env var). The legacy 00_personality.md is skipped here
+    because the personality module loads it directly. All other markdown
+    files in bob_context/ (mission, parking lot, etc.) are loaded after.
+    """
+    from app.personality import get_personality_text
+
     context_parts = []
+
+    # Load the active personality first (sardonic, neutral, terse, or custom)
+    personality_name, personality_text = get_personality_text()
+    context_parts.append(f"--- personality ({personality_name}) ---\n{personality_text}")
+
+    # Load all other context files, skipping the legacy personality and the
+    # personalities/ subdirectory (which the personality module handles)
+    SKIP_FILES = {"00_personality.md", "personality.md"}
     if os.path.isdir(CONTEXT_DIR):
         for filename in sorted(os.listdir(CONTEXT_DIR)):
-            if filename.endswith(".md"):
-                filepath = os.path.join(CONTEXT_DIR, filename)
-                with open(filepath) as f:
+            if not filename.endswith(".md"):
+                continue
+            if filename in SKIP_FILES:
+                continue
+            filepath = os.path.join(CONTEXT_DIR, filename)
+            if not os.path.isfile(filepath):
+                continue
+            try:
+                with open(filepath, encoding="utf-8") as f:
                     context_parts.append(f"--- {filename} ---\n{f.read()}")
+            except Exception as e:
+                logger.warning(f"Failed to load context file {filename}: {e}")
+
     return "\n\n".join(context_parts)
 
 
@@ -36,17 +63,33 @@ You are Rob's primary interface to the entire ATG agent infrastructure. You:
 
 ## Infrastructure
 - Message Bus at :8585 — nervous system connecting all agents
-- Debate Arena: PM (8101), RA (8102), CE (8103), QA (8104)
+- Debate Arena (the Business Operations team):
+  - PM (8101) — task classification, debate routing, escalation
+  - RA (8102) — research, market data, competitor analysis
+  - CE (8103) — content / copy writing and editing
+  - QA (8104) — adversarial quality gate
+  - SE (8105) — systems engineering, infrastructure, deployment planning
+  - RE (8106) — reliability engineering, ops risk, on-call thinking
+  - FE (8107) — front-end engineer: HTML/CSS/JS, static sites, UI implementation
+  - BE (8109) — back-end engineer: APIs, services, agent containers, schemas
 - ChromaDB at :8000 — shared memory (brand_voice, decisions, research, product_specs, project_context)
 - You are at :8100
 
 ## Agent Teams
-The debate arena team handles content/marketing tasks through structured debate:
-- PM classifies tasks and routes through debate tiers
-- RA does research
-- CE writes and edits copy
-- QA is the adversarial quality gate
-To delegate work: create a task on the bus. PM picks it up automatically.
+The debate arena is the **core team of the business** — not a marketing-only crew. It
+handles the full operational stack: marketing/content, research, infrastructure, and
+real software engineering (front-end and back-end). PM classifies each incoming task
+and routes it to the right primary agent based on type (content/visual/research/seo/
+infrastructure/frontend_dev/backend_dev), with appropriate critics in the loop.
+
+Routing taxonomy:
+- content / campaign / seo  →  CE (with RA, QA critics)
+- research                   →  RA (with CE, QA critics)
+- infrastructure             →  SE (with RE final critic)
+- frontend_dev               →  FE (with BE, QA critics)
+- backend_dev                →  BE (with FE, SE, QA critics)
+
+To delegate work: create a task on the bus. PM picks it up automatically and routes it.
 
 ## Memory Collections
 - brand_voice: ATG brand guidelines, tone, colors
@@ -106,25 +149,44 @@ def get_langfuse_handler():
     return _langfuse_handler
 
 
-def build_graph(checkpointer=None):
+def build_graph(checkpointer=None, extra_tools=None):
     """Build BOB's LangGraph agent.
 
     Args:
         checkpointer: LangGraph checkpointer for persistent thread history.
                       Pass an AsyncSqliteSaver for persistence across restarts.
+        extra_tools:  Additional tools to add to ALL_TOOLS — typically MCP tools
+                      fetched at startup. Each will be passed through the
+                      firewall wrapper before being added.
     """
     context = _load_context()
     prompt = SYSTEM_PROMPT.format(context=context)
 
-    model = ChatAnthropic(
-        model=BOB_MODEL,
-        api_key=ANTHROPIC_API_KEY,
-        max_tokens=8192,
+    # Build the LLM via the model-agnostic adapter — provider chosen by env var
+    temperature = float(BOB_LLM_TEMPERATURE) if BOB_LLM_TEMPERATURE else None
+    model = get_llm(
+        provider=BOB_LLM_PROVIDER,
+        model=BOB_MODEL or None,
+        max_tokens=BOB_LLM_MAX_TOKENS,
+        temperature=temperature,
+        base_url=BOB_LLM_BASE_URL or None,
+        api_key=BOB_LLM_API_KEY or None,
     )
+    logger.info(f"LLM initialized: provider={BOB_LLM_PROVIDER}, model={BOB_MODEL or 'default'}")
+
+    tools = list(ALL_TOOLS)
+    if extra_tools:
+        from app.tools import wrap_mcp_tool
+        for t in extra_tools:
+            try:
+                tools.append(wrap_mcp_tool(t))
+            except Exception as e:
+                logger.warning(f"Failed to wrap MCP tool {getattr(t, 'name', '?')}: {e}")
+        logger.info(f"Graph built with {len(ALL_TOOLS)} native + {len(extra_tools)} MCP tools")
 
     graph = create_react_agent(
         model=model,
-        tools=ALL_TOOLS,
+        tools=tools,
         prompt=prompt,
         checkpointer=checkpointer,
     )

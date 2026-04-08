@@ -1,6 +1,5 @@
-"""Researcher Agent — entry point."""
+"""Back-End Engineer Agent — entry point."""
 import asyncio
-import json
 import logging
 import os
 import sys
@@ -11,35 +10,38 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 
 from buslib.agent_base import BaseAgent
-from agent import execute_research, critique_output, revise_output
+from agent import execute_writing, critique_output, revise_output
 
 logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"),
                     format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
-log = logging.getLogger("researcher")
+log = logging.getLogger("be-engineer")
 
 
-class ResearcherAgent(BaseAgent):
-    SHORTHAND = "RA"
-    NAME = "Researcher Agent"
-    ROLE = "Market research, competitor analysis, content research, fact-checking"
+class BackEndEngineerAgent(BaseAgent):
+    SHORTHAND = "BE"
+    NAME = "Back-End Engineer Agent"
+    ROLE = "Back-end implementation: APIs, services, databases, agent containers, integrations"
     CAPABILITIES = [
-        {"name": "market_research"},
-        {"name": "competitor_analysis"},
-        {"name": "content_research"},
-        {"name": "fact_checking"},
+        {"name": "api_implementation"},
+        {"name": "schema_design"},
+        {"name": "service_integration"},
+        {"name": "agent_container_build"},
+        {"name": "migration_planning"},
+        {"name": "security_hardening"},
     ]
-    TOPICS = ["debate:critique"]
+    TOPICS = ["debate:critique", "backend"]
 
     async def handle_task_assignment(self, message: dict, task: dict):
-        """Execute a research task."""
         task_text = message.get("payload", {}).get("task_description") or task["title"]
-        log.info(f"[RA] Starting research: {task_text[:80]}")
+        if task.get("description"):
+            task_text = f"{task['title']}\n\n{task['description']}"
+        log.info(f"[BE] Starting build: {task['title'][:80]}")
 
         await self.bus.update_task(task["id"], state="IN_PROGRESS")
-        await self.send_status(task["id"], "Starting research...")
+        await self.send_status(task["id"], "Building back-end deliverables...")
 
-        result = execute_research(self.claude, task_text, self.MODEL, file_paths=task.get("file_paths") or [])
-        log.info(f"[RA] Research complete, saved to {result.get('_file_path', 'unknown')}")
+        result = execute_writing(self.claude, task_text, self.MODEL)
+        log.info(f"[BE] Build complete: {result.get('_file_path', 'unknown')}")
 
         await self.send_deliverable(
             task_id=task["id"],
@@ -48,19 +50,15 @@ class ResearcherAgent(BaseAgent):
         )
 
     async def handle_critique_request(self, message: dict, task: dict | None):
-        """Handle critique request or revision request."""
         payload = message.get("payload", {})
         action = payload.get("action", "critique")
 
         if action == "revise" and task:
-            # Revise our previous output based on feedback
-            log.info(f"[RA] Revising task #{task['id']}")
+            log.info(f"[BE] Revising task #{task['id']}")
             await self.bus.update_task(task["id"], state="IN_PROGRESS")
-
             previous = payload.get("deliverable") or {}
             critiques = [payload.get("critique", {})]
             task_text = payload.get("task_title") or task["title"]
-
             revised = revise_output(self.claude, previous, critiques, task_text, self.MODEL)
             await self.send_deliverable(
                 task_id=task["id"],
@@ -70,13 +68,10 @@ class ResearcherAgent(BaseAgent):
             )
 
         elif action == "critique":
-            # Critique another agent's work
-            log.info(f"[RA] Critiquing deliverable for task #{task['id'] if task else '?'}")
+            log.info(f"[BE] Critiquing deliverable for task #{task['id'] if task else '?'}")
             deliverable = payload.get("deliverable", {})
             task_text = payload.get("task_title", "")
-
             result = critique_output(self.claude, deliverable, task_text, self.MODEL)
-
             await self.bus.send_message(
                 sender=self.SHORTHAND,
                 recipient="PM",
@@ -88,7 +83,7 @@ class ResearcherAgent(BaseAgent):
             )
 
 
-agent = ResearcherAgent()
+agent = BackEndEngineerAgent()
 
 
 @asynccontextmanager
@@ -100,14 +95,14 @@ async def lifespan(app: FastAPI):
     await agent.stop()
 
 
-app = FastAPI(title="ATG Researcher Agent", lifespan=lifespan)
+app = FastAPI(title="ATG Back-End Engineer Agent", lifespan=lifespan)
 
 
 @app.get("/health")
 async def health():
-    return {"agent": "RA", "status": "ok", "name": agent.NAME}
+    return {"agent": "BE", "status": "ok", "name": agent.NAME}
 
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8102)
+    uvicorn.run(app, host="0.0.0.0", port=8109)

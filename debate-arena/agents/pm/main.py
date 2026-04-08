@@ -32,7 +32,7 @@ class PMAgent(BaseAgent):
 
     def __init__(self):
         super().__init__()
-        self.orch = Orchestrator(self.bus)
+        self.orch = Orchestrator(self.bus, self.claude)
 
     async def handle_message(self, message: dict):
         msg_type = message.get("message_type", "")
@@ -50,7 +50,17 @@ class PMAgent(BaseAgent):
             if new_state == "CREATED" and old_state is None and task_id:
                 task = await self.bus.get_task(task_id)
                 # Only classify if PM didn't create it (avoid self-loop)
-                if task and task.get("assignee") is None:
+                if task and (task.get("assignee") is None or task.get("assignee") == self.SHORTHAND):
+                    await self.orch.classify_and_assign(task)
+
+
+        # BOB delegates directly via task_assignment — pick it up
+        elif msg_type == "task_assignment":
+            payload = message.get("payload", {})
+            task_id = payload.get("task_id") or message.get("task_id")
+            if task_id:
+                task = await self.bus.get_task(task_id)
+                if task:
                     await self.orch.classify_and_assign(task)
 
         # Deliverable from an agent
@@ -68,7 +78,7 @@ class PMAgent(BaseAgent):
             if task_id:
                 task = await self.bus.get_task(task_id)
                 if task:
-                    if sender == "QA" and payload.get("action") == "adversarial_review":
+                    if sender in ("QA", "RE") and payload.get("action") == "adversarial_review":
                         await self.orch.handle_qa_verdict(message, task)
                     elif payload.get("verdict"):
                         await self.orch.handle_critique(message, task)
