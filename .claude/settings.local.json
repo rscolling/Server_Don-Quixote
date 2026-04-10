@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(scp LICENSE CONTRIBUTING.md SECURITY.md ROADMAP.md LLM_PROVIDERS.md MCP_INTEGRATION.md AGENT_BUILDOUT_PLAN.md README.md .env.example .gitignore .dockerignore mcp_servers.example.json blueridge@192.168.1.228:/home/blueridge/bob-orchestrator/)",
+      "Bash(scp bob_context/personalities/sardonic.md bob_context/personalities/neutral.md bob_context/personalities/terse.md blueridge@192.168.1.228:/home/blueridge/bob-orchestrator/bob_context/personalities/)",
+      "Bash(scp bob_context/MISSION.md.example bob_context/IDEA_PARKING_LOT.md.example blueridge@192.168.1.228:/home/blueridge/bob-orchestrator/bob_context/)",
+      "Bash(scp eval/__init__.py eval/runner.py eval/README.md blueridge@192.168.1.228:/home/blueridge/bob-orchestrator/eval/)",
+      "Bash(scp quickstart/README.md quickstart/docker-compose.yml quickstart/.env.example quickstart/mcp_servers.json blueridge@192.168.1.228:/home/blueridge/bob-orchestrator/quickstart/)",
+      "Bash(scp quickstart/researcher/server.py quickstart/researcher/requirements.txt quickstart/researcher/Dockerfile blueridge@192.168.1.228:/home/blueridge/bob-orchestrator/quickstart/researcher/)",
+      "Bash(scp quickstart/coder/server.py quickstart/coder/requirements.txt quickstart/coder/Dockerfile blueridge@192.168.1.228:/home/blueridge/bob-orchestrator/quickstart/coder/)",
+      "Bash(scp Dockerfile docker-compose.yml requirements.txt mcp_servers.json blueridge@192.168.1.228:/home/blueridge/bob-orchestrator/)",
+      "Bash(python -m py_compile app/replay.py app/firewall.py app/main.py)",
+      "Bash(ssh blueridge@100.105.16.120 'curl -s -X POST http://localhost:8100/firewall/confirm/c3d1e2f0; echo; sleep 1; curl -s -X POST http://localhost:8100/chat -H \"Content-Type: application/json\" -d \"{\\\\\"message\\\\\":\\\\\"I just confirmed c3d1e2f0. Retry the approval now.\\\\\",\\\\\"thread_id\\\\\":\\\\\"promo-tool-test-1\\\\\",\\\\\"user\\\\\":\\\\\"rob\\\\\"}\"')",
+      "Bash(tailscale status:*)",
+      "Bash(ssh colli@100.105.16.120 \"hostname && whoami && uptime\")",
+      "Bash(npm create:*)",
+      "Bash(npm install:*)"
+    ]
+  }
+}

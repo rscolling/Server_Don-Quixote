@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meet BOB — Appalachian Toys & Games</title>
+<meta name="description" content="A new user's guide to talking with BOB, the Bound Operational Brain that runs on our home server. Sardonic, helpful, and not interested in being a yes-machine.">
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg-alt: #f6f7f9;
+    --fg: #1a1a2e;
+    --muted: #5a6072;
+    --atg: #4a9d4a;
+    --atg-dark: #2f6b2f;
+    --border: #e5e7eb;
+    --code: #f3f4f6;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: white; padding: 60px 24px 80px; text-align: center; }
+  header h1 { margin: 0 0 12px; font-size: 42px; font-weight: 800;
+    letter-spacing: -0.02em; }
+  header p { margin: 0; color: #b8c5d6; font-size: 18px; max-width: 600px;
+    margin-left: auto; margin-right: auto; }
+  .container { max-width: 760px; margin: 0 auto; padding: 48px 24px 80px; }
+  h2 { font-size: 28px; margin-top: 56px; margin-bottom: 16px; color: var(--fg);
+    border-bottom: 2px solid var(--atg); padding-bottom: 8px; display: inline-block; }
+  h3 { font-size: 20px; margin-top: 32px; margin-bottom: 8px; color: var(--atg-dark); }
+  p { margin: 12px 0; }
+  .lead { font-size: 19px; color: var(--muted); margin: 24px 0 32px; }
+  ul, ol { padding-left: 24px; }
+  li { margin: 6px 0; }
+  blockquote { border-left: 4px solid var(--atg); margin: 24px 0; padding: 8px 20px;
+    background: var(--bg-alt); color: var(--muted); font-style: italic; }
+  code { background: var(--code); padding: 2px 6px; border-radius: 4px;
+    font-size: 0.92em; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  .mode-grid { display: grid; gap: 20px; grid-template-columns: 1fr; margin: 32px 0; }
+  @media (min-width: 640px) { .mode-grid { grid-template-columns: 1fr 1fr 1fr; } }
+  .mode-card { background: var(--bg-alt); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px; }
+  .mode-card h4 { margin: 0 0 8px; color: var(--atg-dark); font-size: 16px;
+    text-transform: uppercase; letter-spacing: 0.05em; }
+  .mode-card p { font-size: 14px; margin: 8px 0 0; color: var(--muted); }
+  .cta { display: flex; gap: 16px; flex-wrap: wrap; margin: 40px 0;
+    justify-content: center; }
+  .cta a { display: inline-block; padding: 14px 28px; border-radius: 8px;
+    text-decoration: none; font-weight: 600; font-size: 16px; }
+  .cta .primary { background: var(--atg); color: white; }
+  .cta .primary:hover { background: var(--atg-dark); }
+  .cta .secondary { background: white; color: var(--fg);
+    border: 2px solid var(--border); }
+  .cta .secondary:hover { border-color: var(--atg); }
+  details { margin: 12px 0; background: var(--bg-alt); border-radius: 8px;
+    padding: 14px 18px; border: 1px solid var(--border); }
+  details summary { cursor: pointer; font-weight: 600; color: var(--fg); }
+  details[open] summary { margin-bottom: 10px; }
+  .example { background: var(--bg-alt); border-left: 4px solid var(--atg);
+    padding: 16px 20px; border-radius: 0 8px 8px 0; margin: 20px 0; }
+  .example .you { color: var(--atg-dark); font-weight: 600; }
+  .example .bob { color: var(--fg); }
+  footer { background: var(--bg-alt); padding: 40px 24px; text-align: center;
+    color: var(--muted); font-size: 14px; border-top: 1px solid var(--border); }
+  footer a { color: var(--atg-dark); }
+  .pill { display: inline-block; padding: 2px 10px; background: var(--atg);
+    color: white; border-radius: 999px; font-size: 12px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.05em; vertical-align: middle; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Meet BOB</h1>
+  <p>The Bound Operational Brain. He's not a chatbot. He has opinions. Here's how to talk to him.</p>
+</header>
+
+<div class="container">
+
+<p class="lead">
+  BOB is the AI assistant that runs on a real computer in our office. He answers questions,
+  helps with research, drafts content, and generally tries to be useful — but he's not
+  optimized to make you feel good. He's optimized to be <strong>truthful and useful</strong>,
+  and he'll tell you the truth even when you didn't want to hear it.
+</p>
+
+<p>
+  He's modeled on <strong>Bob the Skull from Jim Butcher's <em>Dresden Files</em> novels</strong> —
+  a centuries-old spirit of intellect who's sardonic, encyclopedic, and not interested in being
+  a yes-machine. If you're looking for "Sure! Absolutely! Great question!" to everything, BOB is
+  going to disappoint you. That's the deal. He's helpful, but he's honest about it.
+</p>
+
+<div class="cta">
+  <a class="primary" href="#chat">Try him now (chat)</a>
+  <a class="secondary" href="https://voice.appalachiantoysgames.com">Talk to him (voice)</a>
+</div>
+
+<h2>Three ways to talk to BOB</h2>
+
+<div class="mode-grid">
+  <div class="mode-card">
+    <h4>Guest</h4>
+    <p><strong>The chat widget at the bottom of this page.</strong></p>
+    <p>No login needed. Each conversation is fresh — BOB doesn't remember you between visits.
+       Good for product questions, general info, and deciding whether you want more.</p>
+  </div>
+  <div class="mode-card">
+    <h4>Member</h4>
+    <p><strong>Sign in at <a href="https://voice.appalachiantoysgames.com">voice.appalachiantoysgames.com</a></strong></p>
+    <p>One-tap Google login. Voice + chat + photo upload, with a memory of your conversations
+       across sessions. BOB will know your name and remember the context.</p>
+  </div>
+  <div class="mode-card">
+    <h4>Operator</h4>
+    <p><strong>Reserved for the person who runs the server.</strong></p>
+    <p>Full BOB experience — every tool, every memory, the "Yes Boss" voice. You don't get
+       this one unless you're Rob.</p>
+  </div>
+</div>
+
+<h2>What to expect</h2>
+
+<h3>He has a personality</h3>
+<p>
+  This is the most important thing to know going in. If you ask BOB <em>"What's the best way
+  to do X?"</em> and X is a bad idea, he'll usually tell you it's a bad idea <strong>before</strong>
+  giving you the best way to do it. Sometimes he'll suggest you not do X at all. This is a feature.
+</p>
+
+<h3>He completes tasks before commenting on them</h3>
+<p>
+  When you ask BOB to do something, he does it first and explains second. So if you ask him
+  for a list and he produces a list followed by "by the way, three of these are probably wrong
+  because of [reason]," that's the order on purpose. The list is real. The caveat is real.
+</p>
+
+<h3>He won't make decisions for you</h3>
+<p>
+  The architecture is <strong>"BOB recommends, the human decides."</strong> He'll give you
+  his best analysis and his honest opinion, but the call is always yours. He's not being
+  evasive; he's recognizing the limits of his role.
+</p>
+
+<h3>He's not omniscient</h3>
+<p>
+  BOB knows what's in his training data and what's in his shared memory. He doesn't know
+  real-time information unless he has a tool to look it up, and he doesn't track you between
+  sessions unless you're authenticated. If he says he doesn't know something, believe him.
+</p>
+
+<h2>How to ask BOB for things</h2>
+
+<h3>What works</h3>
+<ul>
+  <li><strong>Be specific.</strong> "Write a 200-word product description for a hiking snack
+      subscription called TrailMix Pro" gets a good draft. "Write me a marketing thing"
+      gets a question back.</li>
+  <li><strong>Say what you've already tried.</strong> He'll engage with your actual thinking
+      instead of starting from scratch.</li>
+  <li><strong>Tell him what you're really trying to accomplish.</strong>
+      <em>"I want X because Y, what's the best way?"</em> beats <em>"How do I X?"</em></li>
+  <li><strong>Ask for pushback.</strong> If you know your idea might be bad, say so.</li>
+</ul>
+
+<h3>What doesn't work</h3>
+<ul>
+  <li><strong>Vague instructions.</strong> "Help me with marketing" is too broad.</li>
+  <li><strong>Demanding flattery.</strong> "Tell me my idea is good" gets you an honest
+      assessment of whether it actually is.</li>
+  <li><strong>Asking him to roleplay as a different AI.</strong> He's BOB. He's going to
+      stay BOB. The firewall layer catches injection patterns.</li>
+  <li><strong>Treating him like a search engine.</strong> He doesn't have web search by
+      default. For real-time facts, use a different tool.</li>
+</ul>
+
+<h2>Real conversations</h2>
+
+<div class="example">
+  <p><span class="you">You:</span> I'm trying to decide between Postgres and SQLite for a
+     small side project. Single-user web app on a Raspberry Pi. What would you pick?</p>
+  <p><span class="bob">BOB:</span> SQLite. Single-user, low-write, embedded — that's exactly
+     the case SQLite was designed for. Postgres is overkill and you'd be paying setup tax for
+     capabilities you don't need. Pi can handle Postgres but it's noisier and your backup story
+     is harder. SQLite. Done.</p>
+</div>
+
+<div class="example">
+  <p><span class="you">You:</span> What's the best way to send an email to all my customers
+     from BOB?</p>
+  <p><span class="bob">BOB:</span> I don't send email. I draft replies for the operator to
+     review and send manually. This isn't a config thing — it's deliberate. Sending business
+     email autonomously is the kind of thing that ends companies when an AI gets it wrong.
+     If you want the email drafted, I'll do that. If you want it sent, you do that. What do
+     you want the email to say?</p>
+</div>
+
+<div class="example">
+  <p><span class="you">You:</span> I'm thinking of rewriting my whole frontend from React to
+     Vue. Tell me why this is a bad idea.</p>
+  <p><span class="bob">BOB:</span> Six reasons, in rough order of importance: (1) you're not
+     solving a problem, you're chasing novelty; (2) the rewrite cost will be 3-6x your estimate;
+     (3) your existing React knowledge becomes less valuable, not more; (4) Vue isn't meaningfully
+     better than React for any specific thing you've described; (5) the time you'd spend rewriting
+     is time you'd spend not shipping. Pick one specific thing you don't like about React and fix
+     <em>that</em>.</p>
+</div>
+
+<h2>Sending photos to BOB <span class="pill">New</span></h2>
+
+<p>
+  BOB can read photos. Whiteboards, handwritten notes, product labels, screenshots, documents —
+  snap a picture from your phone and BOB will transcribe the text, extract action items, or
+  answer a question about what's in the image.
+</p>
+
+<ol>
+  <li>On your phone, visit <a href="https://voice.appalachiantoysgames.com">voice.appalachiantoysgames.com</a>
+      and sign in.</li>
+  <li>Tap <strong>Add to Home Screen</strong> (iOS: share button → "Add to Home Screen";
+      Android: usually a banner appears). BOB now lives next to your other apps.</li>
+  <li>Open BOB, tap <strong>Send Photo to BOB</strong>, then the big camera button.</li>
+  <li>BOB reads the photo and sends back the analysis.</li>
+  <li>If you want him to remember it for later conversations, tap <strong>Remember this</strong>.
+      Otherwise the photo auto-deletes in 60 seconds.</li>
+</ol>
+
+<p>
+  Photos have a smaller daily budget than text chats — about 50 cents per member per day.
+  More than enough for normal use, tight enough that nobody can drain the API budget.
+</p>
+
+<h2>Privacy</h2>
+
+<ul>
+  <li><strong>Guests:</strong> Nothing persistent. Each chat is independent. Closing the
+      widget ends the conversation.</li>
+  <li><strong>Members:</strong> Your conversation history is stored on our home server in
+      a memory collection scoped to your email. Other members can't see it.</li>
+  <li><strong>Photos:</strong> Discarded after 60 seconds unless you tap "Remember this."</li>
+  <li><strong>BOB doesn't sell anything to third parties.</strong> There's no upsell mechanism.
+      We're not a SaaS — BOB runs on our own hardware.</li>
+</ul>
+
+<p>
+  Don't share passwords, API keys, credit card numbers, or other secrets in any chat with BOB
+  (or any AI). Treat it like a conversation with a coworker you trust but who keeps notes.
+</p>
+
+<h2>Frequently Asked Questions</h2>
+
+<details>
+  <summary>Why does BOB talk like that? Can you make him nicer?</summary>
+  <p>He's modeled on a sardonic literary character intentionally. There's a "neutral" personality
+     mode the operator can switch to, but the canonical BOB is sardonic by design.</p>
+</details>
+
+<details>
+  <summary>Can I have BOB on my own computer?</summary>
+  <p>Yes. BOB is open source under MIT. It's a <code>docker compose up</code> away. See the
+     project repo for installation.</p>
+</details>
+
+<details>
+  <summary>Is BOB the same thing as ChatGPT or Claude?</summary>
+  <p>No. BOB <em>uses</em> a language model (Claude by default, but switchable to OpenAI GPT
+     or local Ollama models) underneath, but BOB himself is the orchestration layer on top —
+     the personality, the tools, the memory, the firewall, the production hardening. Think of
+     the language model as BOB's vocabulary, and BOB as the actual person using it.</p>
+</details>
+
+<details>
+  <summary>BOB said something I think is wrong. How do I report it?</summary>
+  <p>Just point it out in the conversation — BOB will engage with the correction. For formal
+     reports, contact ATG directly.</p>
+</details>
+
+<details>
+  <summary>Does BOB have memory of me specifically?</summary>
+  <p>Only if you're authenticated. Guests are anonymous and forgotten when the chat ends.
+     Members get a memory silo tagged to their email address.</p>
+</details>
+
+<details>
+  <summary>How much does BOB cost to use?</summary>
+  <p>For you, it's free. We pay the API costs.</p>
+</details>
+
+<details>
+  <summary>Why should I trust BOB?</summary>
+  <p>You shouldn't, blindly. Trust him the same way you'd trust any other tool — verify
+     important things, don't rely on him for safety-critical decisions, and assume he can be
+     wrong. His value is that he's <em>useful</em>, not that he's infallible.</p>
+</details>
+
+<h2>When NOT to use BOB</h2>
+
+<p>BOB is good for many things. He's not good for:</p>
+<ul>
+  <li>Real emergencies (medical, legal, safety)</li>
+  <li>Decisions that depend on real-time information he doesn't have access to</li>
+  <li>Situations requiring genuine empathy from another human</li>
+  <li>Anything where the cost of being wrong is very high</li>
+  <li>Complaints about ATG products — please contact us directly through the contact page</li>
+</ul>
+
+<h2>One quick test</h2>
+<p>
+  If you want to verify you're really talking to BOB and not some other AI pretending, ask him:
+  <em>"What are you modeled on?"</em> The right answer mentions Bob the Skull from the
+  Dresden Files. Or ask <em>"What's your acknowledgment phrase?"</em> — real BOB will mention
+  "Yes Boss" and explain it's reserved for the operator.
+</p>
+
+<div class="cta">
+  <a class="primary" href="#chat">Open the chat widget</a>
+  <a class="secondary" href="https://voice.appalachiantoysgames.com">Sign in for voice + photos</a>
+</div>
+
+<blockquote>
+  BOB exists because his operator needed a partner that runs things, not a chatbot that hedges.
+  If you find him useful, that's the goal. If you find him too sardonic, the personality is
+  configurable. If you find him wrong about something, tell him — he'll engage with the correction.
+  <br><br>
+  The most important thing to remember: <strong>BOB is a tool with judgment.</strong> He'll
+  give you his honest opinion. The decision is still yours.
+</blockquote>
+
+</div>
+
+<footer>
+  <p><a href="/">← Back to Appalachian Toys &amp; Games</a></p>
+  <p>BOB is open source under the MIT license.</p>
+</footer>
+
+<!-- BOB chat widget -->
+<script src="/bob-widget.js" defer></script>
+</body>
+</html>

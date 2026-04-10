@@ -1,0 +1,131 @@
+# Default values for the BOB Helm chart.
+#
+# Override these in your own values file or via `helm install --set ...`
+# Most operators will need to override at minimum:
+#   - bob.image.repository (your container registry)
+#   - bob.env.ANTHROPIC_API_KEY (or whichever LLM provider you're using)
+#   - ingress.host (your public hostname if you're using ingress)
+
+# ── BOB Orchestrator ────────────────────────────────────────────────────────
+
+bob:
+  replicaCount: 1   # Single replica today; multi-replica needs Postgres jobstore (Tier 3 followup)
+
+  image:
+    repository: bob-orchestrator
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    chatPort: 8100
+    mcpPort: 8108
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+
+  # Mounts a PVC for persistent SQLite data (audit log, scheduler jobs,
+  # checkpointer, bus offline queue, cost tracker).
+  persistence:
+    enabled: true
+    size: 5Gi
+    storageClass: ""  # Use default; override for AWS (gp3, etc.)
+
+  # Environment variables passed to BOB. SECRETS should come from a Kubernetes
+  # Secret, not these values — see the secret block below.
+  env:
+    BOB_LLM_PROVIDER: "anthropic"
+    BOB_LLM_MAX_TOKENS: "8192"
+    BOB_LOG_LEVEL: "info"
+    BOB_LOG_FORMAT: "json"
+    BOB_PERSONALITY: "sardonic"
+    MCP_CLIENT_ENABLED: "true"
+    MCP_SERVER_ENABLED: "true"
+    MCP_SERVER_PORT: "8108"
+    MCP_SERVER_TRANSPORT: "sse"
+    SCHEDULER_TIMEZONE: "America/New_York"
+    BOB_REPORT_HOUR: "8"
+    DAILY_BUDGET_USD_TOTAL: "10.00"
+    DAILY_BUDGET_USD_PER_USER: "2.00"
+    MONTHLY_BUDGET_USD_TOTAL: "200.00"
+    A2A_SERVER_ENABLED: "true"
+    CHROMADB_URL: "http://{{ .Release.Name }}-chromadb:8000"
+    MESSAGE_BUS_URL: ""  # Set if you have an external message bus
+
+  # Secrets (create as Kubernetes Secret separately, this just references it)
+  existingSecret: ""  # e.g. "bob-secrets"
+  # Or inline (NOT recommended for production — use existingSecret instead):
+  secrets:
+    ANTHROPIC_API_KEY: ""
+    OPENAI_API_KEY: ""
+    NTFY_TOKEN: ""
+    LANGFUSE_SECRET_KEY: ""
+    DEEPGRAM_API_KEY: ""
+    ELEVENLABS_API_KEY: ""
+
+  # Optional MCP client config — JSON list of upstream MCP servers BOB connects to.
+  # Example:
+  #   mcpServers: |
+  #     [
+  #       {"name": "github", "transport": "sse", "url": "https://mcp.example.com/github"}
+  #     ]
+  mcpServers: "[]"
+
+# ── ChromaDB (shared memory) ────────────────────────────────────────────────
+
+chromadb:
+  enabled: true
+  image:
+    repository: chromadb/chroma
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    port: 8000
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: ""
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+
+# ── Ingress (optional) ──────────────────────────────────────────────────────
+
+ingress:
+  enabled: false
+  className: "nginx"
+  annotations: {}
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+  host: "bob.example.com"
+  tls:
+    enabled: false
+    secretName: ""
+
+# ── Service account ─────────────────────────────────────────────────────────
+
+serviceAccount:
+  create: true
+  name: ""
+
+# ── Pod-level config ────────────────────────────────────────────────────────
+
+podSecurityContext:
+  fsGroup: 1000
+
+securityContext:
+  runAsNonRoot: false  # The current Dockerfile runs as root; set true once that's fixed
+  # capabilities:
+  #   drop: [ALL]
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

@@ -1,0 +1,28 @@
+[
+  {
+    "name": "filesystem",
+    "transport": "stdio",
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-filesystem", "/data/shared"],
+    "env": {}
+  },
+  {
+    "name": "github",
+    "transport": "sse",
+    "url": "https://your-mcp-host.example.com/github/sse",
+    "headers": {
+      "Authorization": "Bearer YOUR_TOKEN_HERE"
+    }
+  },
+  {
+    "name": "fetch",
+    "transport": "stdio",
+    "command": "uvx",
+    "args": ["mcp-server-fetch"]
+  },
+  {
+    "name": "postgres",
+    "transport": "streamable-http",
+    "url": "http://localhost:9001/mcp"
+  }
+]

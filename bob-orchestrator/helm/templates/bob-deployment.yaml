@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "bob.fullname" . }}
+  labels:
+    {{- include "bob.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.bob.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "bob.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "bob.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "bob.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: bob
+          image: "{{ .Values.bob.image.repository }}:{{ .Values.bob.image.tag }}"
+          imagePullPolicy: {{ .Values.bob.image.pullPolicy }}
+          ports:
+            - name: chat
+              containerPort: 8100
+              protocol: TCP
+            - name: mcp
+              containerPort: 8108
+              protocol: TCP
+          env:
+            {{- range $key, $value := .Values.bob.env }}
+            - name: {{ $key }}
+              value: {{ tpl ($value | toString) $ | quote }}
+            {{- end }}
+            # Secrets injected from a Kubernetes Secret (existingSecret) OR
+            # from the inline values (NOT recommended for production).
+            {{- if .Values.bob.existingSecret }}
+            {{- range $key, $_ := .Values.bob.secrets }}
+            - name: {{ $key }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.bob.existingSecret }}
+                  key: {{ $key }}
+                  optional: true
+            {{- end }}
+            {{- else }}
+            {{- range $key, $value := .Values.bob.secrets }}
+            {{- if $value }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- end }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: chat
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: chat
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.bob.resources | nindent 12 }}
+          volumeMounts:
+            {{- if .Values.bob.persistence.enabled }}
+            - name: data
+              mountPath: /app/data
+            {{- end }}
+            - name: mcp-config
+              mountPath: /app/data/mcp_servers.json
+              subPath: mcp_servers.json
+              readOnly: true
+      volumes:
+        {{- if .Values.bob.persistence.enabled }}
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "bob.fullname" . }}-data
+        {{- end }}
+        - name: mcp-config
+          configMap:
+            name: {{ include "bob.fullname" . }}-mcp-config

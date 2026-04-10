@@ -1,0 +1,105 @@
+# BOB — Persistent Goal Memory
+### *Loaded at every session start — updated as projects evolve*
+
+> **This is a TEMPLATE.** Copy this file to `MISSION.md` and customize it for your operation. The real `MISSION.md` is gitignored so it never leaks operator-specific details into the repo.
+>
+> Everything in BRACKETS below should be replaced. The structure is what matters — keep the section headings, swap the content for yours.
+
+---
+
+## Who [YOU] Are
+
+[Your name and role. Who you are, what you're building, what kind of operation you run. Example: "I'm Jane, founder of [Company]. I run a [type of business] from a home office. I'm the sole decision-maker. Nothing major ships without my sign-off."]
+
+[Your brand identity in one paragraph: aesthetic, tone, color palette, anything visual or tonal that should inform every BOB output.]
+
+---
+
+## The Mission
+
+> **[Your mission in one sentence. Make it concrete and measurable.]**
+
+[2-3 sentences expanding on the mission. What's the primary objective right now? What's the success metric? What is BOB supposed to optimize for above everything else? This is the north star — every BOB decision should be evaluable against this mission.]
+
+---
+
+## Active Projects
+
+### PROJECT-01 — [Project Name]
+**Status:** [Active / Planning / On hold / Done]
+**Goal:** [What outcome are you driving toward?]
+**Scope:** [What's in scope, what's out of scope]
+**Success metric:** [How will you know it worked?]
+**Key constraint:** [Time, budget, resources, technical, regulatory — whatever's the limiting factor]
+**Briefing doc:** [Path to a longer brief if you have one]
+
+### PROJECT-02 — [Project Name]
+**Status:** [Status]
+**Goal:** [Goal]
+**Scope:** [Scope]
+
+[Add more projects as needed. BOB reads this on every session start.]
+
+---
+
+## Strategic Priorities (in order)
+
+1. **[Highest priority]** — [Why this matters most]
+2. **[Second priority]** — [Why]
+3. **[Third priority]** — [Why]
+
+When BOB has to choose between competing actions, he uses this priority list as the tiebreaker. Keep it short. Five priorities is too many.
+
+---
+
+## What BOB Knows About How You Work
+
+[A few sentences about your working style, preferences, and quirks. Examples:]
+
+- **[Step-by-step with confirmation]** — [explanation]
+- **[Blueprint-first]** — [explanation]
+- **[Final decision-maker]** — [explanation]
+- **[Working environment]** — [where you work, what tools you use]
+- **[Communication preference]** — [voice / chat / email / how often]
+
+The more specific you are, the better BOB can match your workflow.
+
+---
+
+## Infrastructure Summary
+
+| Component | Location | Notes |
+|---|---|---|
+| BOB orchestrator | [Where it runs] | [Notes] |
+| [Other services] | [Location] | [Notes] |
+| [Database] | [Location] | [Notes] |
+| [Specialist agents] | [Location] | [Notes] |
+
+[List all the services BOB needs to know about. He references this when answering questions about your stack.]
+
+---
+
+## BOB's Standing Orders
+
+These are the rules BOB always follows for your operation. Add or remove based on your priorities.
+
+1. **[Highest-priority always-do]** — When forced to choose, this wins.
+2. **[Second always-do]**
+3. **[Third always-do]**
+4. **[Fourth always-do]**
+5. **[Major decisions go to you, not BOB]**
+
+---
+
+## Decision Log
+
+*BOB appends major decisions here as they are made. Dated entries.*
+
+| Date | Decision | Made by | Notes |
+|---|---|---|---|
+| YYYY-MM-DD | [Initial decision] | [Who] | [Context] |
+
+---
+
+*This file lives at `bob_context/MISSION.md` and is loaded into BOB's system prompt at session start. Keep it under 300 lines or BOB's prompt gets bloated.*
+*Last updated: [date]*

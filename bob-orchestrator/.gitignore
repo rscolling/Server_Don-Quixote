@@ -1,0 +1,86 @@
+# ── Secrets ─────────────────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+*.env
+!*.env.example
+
+# Gmail OAuth (BOB never commits these)
+credentials.json
+token.json
+gmail_token.json
+gmail_credentials.json
+
+# MCP server config — may contain bearer tokens for upstream MCP servers
+mcp_servers.json
+!mcp_servers.example.json
+!quickstart/mcp_servers.json
+
+# ── Personal context ────────────────────────────────────────────────────────
+# bob_context/ contains the system prompt files. The personality file is
+# generic and ships with the repo. The mission and parking-lot files are
+# operator-specific — ship the .example versions, gitignore the real ones.
+bob_context/MISSION.md
+bob_context/IDEA_PARKING_LOT.md
+!bob_context/*.example
+!bob_context/00_personality.md
+
+# ── Data and logs ───────────────────────────────────────────────────────────
+data/
+*.db
+*.sqlite
+*.sqlite3
+*.jsonl
+*.log
+
+# ── Python ──────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# ── IDEs ────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ── Docker ──────────────────────────────────────────────────────────────────
+docker-compose.override.yml
+.docker/

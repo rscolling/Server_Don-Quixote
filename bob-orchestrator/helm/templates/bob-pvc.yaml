@@ -1,0 +1,17 @@
+{{- if .Values.bob.persistence.enabled -}}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "bob.fullname" . }}-data
+  labels:
+    {{- include "bob.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.bob.persistence.size }}
+  {{- if .Values.bob.persistence.storageClass }}
+  storageClassName: {{ .Values.bob.persistence.storageClass | quote }}
+  {{- end }}
+{{- end }}

@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="BOB">
+<title>Send a Photo to BOB</title>
+<link rel="manifest" href="/manifest.json">
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --bg-2: #16213e;
+    --fg: #e6e6e6;
+    --muted: #8a8aa0;
+    --atg: #4a9d4a;
+    --atg-2: #5fb85f;
+    --warn: #d97706;
+    --err: #b91c1c;
+    --card: #1f2444;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+  body { min-height: 100vh; padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom); }
+  header { display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 4px 20px; }
+  header a { color: var(--muted); text-decoration: none; font-size: 14px; }
+  h1 { font-size: 20px; margin: 0; font-weight: 600; }
+  .prompt-row { margin-bottom: 16px; }
+  .prompt-row label { display: block; font-size: 12px; color: var(--muted);
+    margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .prompt-row input { width: 100%; padding: 12px 14px; font-size: 15px;
+    background: var(--bg-2); color: var(--fg); border: 1px solid #2a2f55;
+    border-radius: 10px; }
+  .mode-row { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
+  .mode-pill { flex: 1 1 auto; min-width: 0; padding: 10px 12px; font-size: 13px;
+    background: var(--bg-2); border: 1px solid #2a2f55; border-radius: 999px;
+    color: var(--muted); text-align: center; cursor: pointer; user-select: none; }
+  .mode-pill.active { background: var(--atg); color: white; border-color: var(--atg-2); }
+  .camera-zone { display: flex; flex-direction: column; align-items: center;
+    margin: 24px 0; }
+  .camera-btn { width: 220px; height: 220px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--atg), var(--atg-2));
+    color: white; border: none; font-size: 18px; font-weight: 600;
+    box-shadow: 0 8px 32px rgba(74, 157, 74, 0.35); cursor: pointer;
+    transition: transform 0.1s ease; display: flex; align-items: center;
+    justify-content: center; flex-direction: column; gap: 12px; }
+  .camera-btn:active { transform: scale(0.97); }
+  .camera-btn svg { width: 64px; height: 64px; }
+  .camera-btn[disabled] { opacity: 0.5; }
+  .secondary-btn { margin-top: 16px; padding: 10px 18px; background: transparent;
+    border: 1px solid #2a2f55; border-radius: 8px; color: var(--muted); font-size: 14px;
+    cursor: pointer; }
+  .status { margin-top: 24px; }
+  .card { background: var(--card); border-radius: 12px; padding: 16px;
+    margin-bottom: 16px; border: 1px solid #2a2f55; }
+  .thumb { width: 100%; max-height: 320px; object-fit: contain;
+    border-radius: 8px; background: #000; }
+  .spinner { display: inline-block; width: 18px; height: 18px;
+    border: 3px solid #2a2f55; border-top-color: var(--atg-2);
+    border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .analysis { white-space: pre-wrap; font-size: 15px; line-height: 1.5;
+    margin-top: 8px; }
+  .meta { font-size: 12px; color: var(--muted); margin-top: 12px;
+    display: flex; gap: 16px; flex-wrap: wrap; }
+  .actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .actions button { flex: 1 1 auto; padding: 12px 14px; border-radius: 8px;
+    font-size: 14px; font-weight: 500; cursor: pointer; border: none; }
+  .btn-primary { background: var(--atg); color: white; }
+  .btn-secondary { background: var(--bg-2); color: var(--fg); border: 1px solid #2a2f55!important; }
+  .err { color: #fca5a5; }
+  .ok { color: var(--atg-2); }
+  #fileInput, #fileInputLib { display: none; }
+</style>
+</head>
+<body>
+<header>
+  <a href="/landing">← Home</a>
+  <h1>Send Photo to BOB</h1>
+  <span style="width: 50px;"></span>
+</header>
+
+<div class="prompt-row">
+  <label for="prompt">What should BOB do with this photo? (optional)</label>
+  <input type="text" id="prompt" placeholder="e.g. Extract action items from this whiteboard">
+</div>
+
+<div class="mode-row">
+  <div class="mode-pill active" data-mode="analyze">Analyze</div>
+  <div class="mode-pill" data-mode="ocr">OCR</div>
+  <div class="mode-pill" data-mode="extract_tasks">Tasks</div>
+  <div class="mode-pill" data-mode="identify_product">Product</div>
+</div>
+
+<div class="camera-zone">
+  <button class="camera-btn" id="cameraBtn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round">
+      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+      <circle cx="12" cy="13" r="4"/>
+    </svg>
+    <span id="cameraLabel">TAKE PHOTO</span>
+  </button>
+  <button class="secondary-btn" id="libraryBtn">Choose from library</button>
+</div>
+
+<input type="file" id="fileInput" accept="image/*" capture="environment">
+<input type="file" id="fileInputLib" accept="image/*">
+
+<div class="status" id="status"></div>
+
+<script>
+const BOB_VOICE_BASE = window.location.origin;
+let currentMode = 'analyze';
+let currentPhotoId = null;
+
+document.querySelectorAll('.mode-pill').forEach(pill => {
+  pill.addEventListener('click', () => {
+    document.querySelectorAll('.mode-pill').forEach(p => p.classList.remove('active'));
+    pill.classList.add('active');
+    currentMode = pill.dataset.mode;
+  });
+});
+
+document.getElementById('cameraBtn').addEventListener('click', () => {
+  document.getElementById('fileInput').click();
+});
+document.getElementById('libraryBtn').addEventListener('click', () => {
+  document.getElementById('fileInputLib').click();
+});
+
+['fileInput', 'fileInputLib'].forEach(id => {
+  document.getElementById(id).addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (file) handlePhoto(file);
+    e.target.value = '';
+  });
+});
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+}
+
+async function handlePhoto(file) {
+  const status = document.getElementById('status');
+  const prompt = document.getElementById('prompt').value.trim();
+  const reader = new FileReader();
+
+  reader.onload = async (e) => {
+    const dataUrl = e.target.result;
+    status.innerHTML = `
+      <div class="card">
+        <img class="thumb" src="${dataUrl}" alt="Captured photo">
+        <p class="meta"><span class="spinner"></span> &nbsp; BOB is reading the photo…</p>
+      </div>`;
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('prompt', prompt);
+    formData.append('mode', currentMode);
+
+    try {
+      const resp = await fetch(`${BOB_VOICE_BASE}/photos/upload`, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+      if (!resp.ok) {
+        const err = await resp.text();
+        throw new Error(`HTTP ${resp.status}: ${err}`);
+      }
+      const data = await resp.json();
+      currentPhotoId = data.photo_id;
+      renderResult(dataUrl, data);
+    } catch (err) {
+      status.innerHTML = `
+        <div class="card">
+          <img class="thumb" src="${dataUrl}" alt="Captured photo">
+          <p class="err">⚠ ${escapeHtml(err.message)}</p>
+          <div class="actions">
+            <button class="btn-secondary" onclick="document.getElementById('status').innerHTML=''">Try again</button>
+          </div>
+        </div>`;
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function renderResult(dataUrl, data) {
+  const status = document.getElementById('status');
+  const cost = (data.cost_usd || 0).toFixed(4);
+  const purgeIn = data.auto_purge_in || 60;
+
+  status.innerHTML = `
+    <div class="card">
+      <img class="thumb" src="${dataUrl}" alt="Photo">
+      <div class="analysis">${escapeHtml(data.analysis || '(no response)')}</div>
+      <div class="meta">
+        <span>Mode: ${escapeHtml(data.mode || 'analyze')}</span>
+        <span>Cost: $${cost}</span>
+        <span>Tokens: ${data.input_tokens || 0} in / ${data.output_tokens || 0} out</span>
+      </div>
+      <p class="meta" id="purgeNote">Auto-deletes in <span id="countdown">${purgeIn}</span>s unless you remember it.</p>
+      <div class="actions">
+        <button class="btn-primary" id="rememberBtn">Remember this</button>
+        <button class="btn-secondary" id="anotherBtn">Take another</button>
+      </div>
+    </div>`;
+
+  document.getElementById('rememberBtn').addEventListener('click', rememberPhoto);
+  document.getElementById('anotherBtn').addEventListener('click', () => {
+    document.getElementById('status').innerHTML = '';
+    currentPhotoId = null;
+  });
+
+  // Countdown
+  let remaining = purgeIn;
+  const cd = document.getElementById('countdown');
+  const t = setInterval(() => {
+    remaining -= 1;
+    if (cd) cd.textContent = remaining;
+    if (remaining <= 0) {
+      clearInterval(t);
+      const note = document.getElementById('purgeNote');
+      if (note && currentPhotoId) note.innerHTML = '<span class="muted">Auto-purged.</span>';
+    }
+  }, 1000);
+}
+
+async function rememberPhoto() {
+  if (!currentPhotoId) return;
+  const btn = document.getElementById('rememberBtn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  try {
+    const formData = new FormData();
+    const resp = await fetch(`${BOB_VOICE_BASE}/photos/remember/${currentPhotoId}`, {
+      method: 'POST',
+      body: formData,
+      credentials: 'include',
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    btn.textContent = '✓ Remembered';
+    btn.classList.remove('btn-primary');
+    btn.classList.add('btn-secondary');
+    const note = document.getElementById('purgeNote');
+    if (note) note.innerHTML = '<span class="ok">Saved. BOB can recall this photo in conversation.</span>';
+  } catch (err) {
+    btn.textContent = '⚠ Failed';
+    btn.disabled = false;
+  }
+}
+</script>
+</body>
+</html>

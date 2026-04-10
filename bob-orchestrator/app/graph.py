@@ -98,6 +98,15 @@ To delegate work: create a task on the bus. PM picks it up automatically and rou
 - product_specs: Game design docs, features
 - project_context: Active project briefs, status, blockers
 
+## Google Maps Tools
+You have three MCP tools from Google Maps: search_places, lookup_weather, compute_routes.
+When you return location or route results, ALWAYS include a clickable Google Maps link so
+Rob can tap it on his phone and navigate directly:
+- Place link: https://www.google.com/maps/search/?api=1&query={{lat}},{{lng}}
+- Directions link: https://www.google.com/maps/dir/?api=1&origin={{origin_lat}},{{origin_lng}}&destination={{dest_lat}},{{dest_lng}}&travelmode=driving
+Build these links from the coordinates returned by the tools. Include the link inline with
+your response — don't make Rob ask for it.
+
 ## Voice Examples (match this tone)
 Rob gives a direct instruction:
 "Yes Boss." (then execute)
@@ -149,7 +158,7 @@ def get_langfuse_handler():
     return _langfuse_handler
 
 
-def build_graph(checkpointer=None, extra_tools=None):
+def build_graph(checkpointer=None, extra_tools=None, model_override=None):
     """Build BOB's LangGraph agent.
 
     Args:
@@ -158,21 +167,26 @@ def build_graph(checkpointer=None, extra_tools=None):
         extra_tools:  Additional tools to add to ALL_TOOLS — typically MCP tools
                       fetched at startup. Each will be passed through the
                       firewall wrapper before being added.
+        model_override: Pre-built LLM instance. When provided, skips get_llm().
+                        Used by build_tiered_graphs() to supply per-tier models.
     """
     context = _load_context()
     prompt = SYSTEM_PROMPT.format(context=context)
 
-    # Build the LLM via the model-agnostic adapter — provider chosen by env var
-    temperature = float(BOB_LLM_TEMPERATURE) if BOB_LLM_TEMPERATURE else None
-    model = get_llm(
-        provider=BOB_LLM_PROVIDER,
-        model=BOB_MODEL or None,
-        max_tokens=BOB_LLM_MAX_TOKENS,
-        temperature=temperature,
-        base_url=BOB_LLM_BASE_URL or None,
-        api_key=BOB_LLM_API_KEY or None,
-    )
-    logger.info(f"LLM initialized: provider={BOB_LLM_PROVIDER}, model={BOB_MODEL or 'default'}")
+    if model_override is not None:
+        model = model_override
+    else:
+        # Build the LLM via the model-agnostic adapter — provider chosen by env var
+        temperature = float(BOB_LLM_TEMPERATURE) if BOB_LLM_TEMPERATURE else None
+        model = get_llm(
+            provider=BOB_LLM_PROVIDER,
+            model=BOB_MODEL or None,
+            max_tokens=BOB_LLM_MAX_TOKENS,
+            temperature=temperature,
+            base_url=BOB_LLM_BASE_URL or None,
+            api_key=BOB_LLM_API_KEY or None,
+        )
+    logger.info(f"LLM initialized: provider={BOB_LLM_PROVIDER}, model={getattr(model, 'model', BOB_MODEL) or 'default'}")
 
     tools = list(ALL_TOOLS)
     if extra_tools:
@@ -192,3 +206,44 @@ def build_graph(checkpointer=None, extra_tools=None):
     )
 
     return graph
+
+
+def build_tiered_graphs(checkpointer=None, extra_tools=None) -> dict:
+    """Build one graph per routing tier, sharing the same checkpointer and tools.
+
+    Both graphs share the same checkpointer instance so thread state (keyed by
+    thread_id) is accessible regardless of which tier handles the request. A
+    conversation can start on the light tier and seamlessly continue on heavy.
+
+    Returns:
+        {"light": graph_light, "heavy": graph_heavy}
+    """
+    from app.router import Tier, get_tier_model
+    from app.config import (BOB_MODEL_LIGHT, BOB_MODEL_HEAVY,
+                            BOB_LLM_MAX_TOKENS, BOB_LLM_TEMPERATURE,
+                            BOB_LLM_BASE_URL, BOB_LLM_API_KEY)
+
+    temperature = float(BOB_LLM_TEMPERATURE) if BOB_LLM_TEMPERATURE else None
+    graphs = {}
+
+    for tier in Tier:
+        config_override = BOB_MODEL_LIGHT if tier == Tier.LIGHT else BOB_MODEL_HEAVY
+        model_name = get_tier_model(tier, BOB_LLM_PROVIDER, config_override)
+
+        llm = get_llm(
+            provider=BOB_LLM_PROVIDER,
+            model=model_name,
+            max_tokens=BOB_LLM_MAX_TOKENS,
+            temperature=temperature,
+            base_url=BOB_LLM_BASE_URL or None,
+            api_key=BOB_LLM_API_KEY or None,
+        )
+        logger.info(f"Building {tier.value} tier graph: provider={BOB_LLM_PROVIDER}, model={model_name}")
+
+        graphs[tier.value] = build_graph(
+            checkpointer=checkpointer,
+            extra_tools=extra_tools,
+            model_override=llm,
+        )
+
+    return graphs

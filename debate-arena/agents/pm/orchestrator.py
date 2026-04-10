@@ -170,7 +170,8 @@ class Orchestrator:
         # If no debate, approve directly
         if meta.max_rounds == 0:
             await self.bus.update_task(task["id"], state="ACCEPTED")
-            log.info(f"[PM] Task #{task['id']} auto-approved (no_debate tier)")
+            await self.bus.update_task(task["id"], state="CLOSED")
+            log.info(f"[PM] Task #{task['id']} auto-approved and closed (no_debate tier)")
             return
 
         # Route to critics
@@ -211,6 +212,8 @@ class Orchestrator:
                 await self._route_to_qa(message, task, meta)
             else:
                 await self.bus.update_task(task["id"], state="ACCEPTED")
+                await self.bus.update_task(task["id"], state="CLOSED")
+                log.info(f"[PM] Task #{task['id']} accepted and closed (light_review)")
         elif verdict == "reject" or verdict == "revise":
             meta.current_round += 1
             if meta.current_round >= meta.max_rounds:
@@ -273,6 +276,8 @@ class Orchestrator:
             if verdict == "not_my_domain":
                 log.warning(f"[PM] Final critic returned not_my_domain on task #{task['id']} — auto-accepting; routing was wrong")
             await self.bus.update_task(task["id"], state="ACCEPTED")
+            await self.bus.update_task(task["id"], state="CLOSED")
+            log.info(f"[PM] Task #{task['id']} accepted and closed (final critic: {verdict})")
         else:
             meta.current_round += 1
             if meta.current_round >= meta.max_rounds:
@@ -308,12 +313,14 @@ class Orchestrator:
         log.info(f"[PM] Escalating task #{task['id']}: level={meta.escalation_level}, type={escalation_type}")
 
         if escalation_type in ("mediator", "orchestrator"):
-            # Auto-accept with note
+            # Auto-accept with note, then close
             await self.bus.update_task(
                 task["id"],
                 state="ACCEPTED",
                 metadata={"debate": meta.model_dump()},
             )
+            await self.bus.update_task(task["id"], state="CLOSED")
+            log.info(f"[PM] Task #{task['id']} escalation auto-accepted and closed")
             await self.bus.send_message(
                 sender="PM",
                 recipient="ALL",

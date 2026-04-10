@@ -1,0 +1,20 @@
+tunnel: 05132ce0-3905-4047-97fa-ab2f0da0730d
+credentials-file: /home/nonroot/.cloudflared/05132ce0-3905-4047-97fa-ab2f0da0730d.json
+
+ingress:
+  # BOB Voice — multi-user voice interface (Cloudflare Zero Trust handles auth)
+  - hostname: voice.appalachiantoysgames.com
+    service: http://host.docker.internal:8150
+
+  # BOB orchestrator — chat, status, dashboard endpoints
+  - hostname: bob.appalachiantoysgames.com
+    service: http://host.docker.internal:8100
+
+  # BOB MCP server — exposes BOB as MCP to Claude Desktop, Cursor, goose, etc.
+  # MUST be behind Cloudflare Zero Trust for any sensitive workflows.
+  # Port 8108 (8101-8104 reserved for debate arena PM/RA/CE/QA)
+  - hostname: bob-mcp.appalachiantoysgames.com
+    service: http://host.docker.internal:8108
+
+  # Catch-all
+  - service: http_status:404

@@ -1,0 +1,107 @@
+# BOB Quickstart — minimal stack to see the orchestrator pattern in 10 minutes
+#
+# Brings up:
+#   - bob          (the orchestrator at :8100)
+#   - chromadb     (shared memory at :8000)
+#   - researcher   (specialist MCP agent at :9001)
+#   - coder        (specialist MCP agent at :9002)
+#
+# Excludes the full production stack (message bus, debate arena, voice service,
+# Langfuse, Uptime Kuma, ntfy). For the full stack, see ../docker-compose.yml.
+#
+# Usage:
+#   1. cp .env.example .env  (and add your ANTHROPIC_API_KEY)
+#   2. docker compose up --build
+#   3. curl http://localhost:8100/health
+#   4. curl -X POST http://localhost:8100/chat -H 'Content-Type: application/json' \
+#        -d '{"message":"Research what MCP is, then write me a Python hello-world."}'
+#
+# BOB will delegate research to the researcher agent (via MCP), receive findings,
+# delegate code-writing to the coder agent (via MCP), and return a combined response.
+
+services:
+  bob:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: bob-quickstart
+    restart: unless-stopped
+    ports:
+      - "8100:8100"
+    env_file:
+      - .env
+    environment:
+      - BOB_DATA_DIR=/app/data
+      - MCP_CLIENT_ENABLED=true
+      - MCP_CLIENT_CONFIG_PATH=/app/data/mcp_servers.json
+      - MCP_SERVER_ENABLED=false   # Quickstart doesn't expose BOB as MCP server
+      - CHROMADB_URL=http://chromadb:8000
+      # Disable services not in the quickstart so BOB doesn't waste startup time
+      - MESSAGE_BUS_URL=http://disabled:0
+      - NTFY_URL=http://disabled:0
+      - LANGFUSE_HOST=http://disabled:0
+      - GMAIL_TOKEN_PATH=/dev/null
+      - GMAIL_CREDENTIALS_PATH=/dev/null
+    volumes:
+      - ../bob_context:/app/bob_context:ro
+      - bob_quickstart_data:/app/data
+      - ./mcp_servers.json:/app/data/mcp_servers.json:ro
+    depends_on:
+      chromadb:
+        condition: service_started
+      researcher:
+        condition: service_started
+      coder:
+        condition: service_started
+    networks:
+      - bob-quickstart
+
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: chromadb-quickstart
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_quickstart_data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+      - ANONYMIZED_TELEMETRY=FALSE
+    networks:
+      - bob-quickstart
+
+  researcher:
+    build:
+      context: ./researcher
+    container_name: researcher-quickstart
+    restart: unless-stopped
+    ports:
+      - "9001:9001"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - RESEARCHER_MODEL=${RESEARCHER_MODEL:-claude-haiku-4-5}
+      - RESEARCHER_PORT=9001
+    networks:
+      - bob-quickstart
+
+  coder:
+    build:
+      context: ./coder
+    container_name: coder-quickstart
+    restart: unless-stopped
+    ports:
+      - "9002:9002"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - CODER_MODEL=${CODER_MODEL:-claude-sonnet-4-5}
+      - CODER_PORT=9002
+    networks:
+      - bob-quickstart
+
+volumes:
+  bob_quickstart_data:
+  chroma_quickstart_data:
+
+networks:
+  bob-quickstart:
+    driver: bridge

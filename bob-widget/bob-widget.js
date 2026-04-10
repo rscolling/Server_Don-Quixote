@@ -6,6 +6,16 @@
 
   var threadId = "guest-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
 
+  // Browser geolocation
+  var userLat = null, userLon = null;
+  if ("geolocation" in navigator) {
+    navigator.geolocation.getCurrentPosition(
+      function(pos) { userLat = pos.coords.latitude; userLon = pos.coords.longitude; },
+      function() { /* denied or unavailable — no-op */ },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }
+
   // Inject styles
   var style = document.createElement("style");
   style.textContent = '\
@@ -293,10 +303,15 @@
       "You can discuss ATG products, Bear Creek Trail, and general topics.]\n\n" + text;
 
     try {
+      var body = { message: prefixed, thread_id: threadId };
+      if (userLat !== null && userLon !== null) {
+        body.latitude = userLat;
+        body.longitude = userLon;
+      }
       var resp = await fetch(BOB_API + "/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: prefixed, thread_id: threadId }),
+        body: JSON.stringify(body),
       });
 
       if (!resp.ok) throw new Error("HTTP " + resp.status);

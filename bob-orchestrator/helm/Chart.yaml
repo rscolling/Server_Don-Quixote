@@ -1,0 +1,31 @@
+apiVersion: v2
+name: bob
+description: |
+  BOB — Bound Operational Brain. A sardonic, self-hosted multi-agent
+  AI orchestrator. This chart deploys BOB the orchestrator plus its
+  dependencies (ChromaDB) on Kubernetes.
+
+  Status: ALPHA. Not production-tested yet. The home-server prototype
+  proves the architecture; this chart is the prep work for the AWS
+  Kubernetes migration on the roadmap.
+
+type: application
+version: 0.1.0-alpha
+appVersion: "1.0.0"
+
+keywords:
+  - ai
+  - agents
+  - llm
+  - multi-agent
+  - orchestrator
+  - mcp
+  - self-hosted
+
+home: https://github.com/your-username/bob
+sources:
+  - https://github.com/your-username/bob
+
+maintainers:
+  - name: Robert Colling
+    url: https://appalachiantoysgames.com

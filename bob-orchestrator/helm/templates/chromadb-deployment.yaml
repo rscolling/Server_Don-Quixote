@@ -1,0 +1,76 @@
+{{- if .Values.chromadb.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "bob.chromadb.fullname" . }}
+  labels:
+    {{- include "bob.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "bob.chromadb.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "bob.chromadb.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: chromadb
+          image: "{{ .Values.chromadb.image.repository }}:{{ .Values.chromadb.image.tag }}"
+          imagePullPolicy: {{ .Values.chromadb.image.pullPolicy }}
+          ports:
+            - containerPort: 8000
+              protocol: TCP
+          env:
+            - name: IS_PERSISTENT
+              value: "TRUE"
+            - name: ANONYMIZED_TELEMETRY
+              value: "FALSE"
+          volumeMounts:
+            - name: data
+              mountPath: /chroma/chroma
+          resources:
+            {{- toYaml .Values.chromadb.resources | nindent 12 }}
+      volumes:
+        - name: data
+          {{- if .Values.chromadb.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "bob.chromadb.fullname" . }}-data
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "bob.chromadb.fullname" . }}
+  labels:
+    {{- include "bob.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.chromadb.service.port }}
+      targetPort: 8000
+      protocol: TCP
+  selector:
+    {{- include "bob.chromadb.selectorLabels" . | nindent 4 }}
+{{- if .Values.chromadb.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "bob.chromadb.fullname" . }}-data
+  labels:
+    {{- include "bob.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.chromadb.persistence.size }}
+  {{- if .Values.chromadb.persistence.storageClass }}
+  storageClassName: {{ .Values.chromadb.persistence.storageClass | quote }}
+  {{- end }}
+{{- end }}
+{{- end }}

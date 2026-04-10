@@ -9,15 +9,25 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 import httpx
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
-from app.graph import build_graph, get_langfuse_handler
+from app.graph import build_graph, build_tiered_graphs, get_langfuse_handler
 from app.memory import init_collections
-from app.config import CHECKPOINT_DB_PATH, CORS_ORIGINS, validate_config
+from app.config import (
+    CHECKPOINT_DB_PATH,
+    CORS_ORIGINS,
+    validate_config,
+    MCP_CLIENT_ENABLED,
+    MCP_CLIENT_CONFIG_PATH,
+    MCP_CLIENT_FETCH_TIMEOUT,
+    MCP_SERVER_ENABLED,
+    MCP_SERVER_PORT,
+    MCP_SERVER_TRANSPORT,
+)
 from app import bus_client
 
 from app.logging_config import setup_logging
@@ -26,6 +36,7 @@ logger = logging.getLogger("bob")
 
 _start_time = time.time()
 _graph = None
+_tiered_graphs = None
 _thread_counter = 0
 
 
@@ -42,7 +53,7 @@ async def _ntfy_send(topic: str, title: str, message: str, priority: str = "defa
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _graph
+    global _graph, _tiered_graphs
     logger.info("BOB is waking up...")
 
     # Validate config
@@ -73,18 +84,40 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Message bus not ready yet: {e}")
 
-    # Build the graph with persistent checkpointer
+    # Fetch MCP tools from external servers (must happen BEFORE building the graph)
+    mcp_tools = []
+    if MCP_CLIENT_ENABLED:
+        try:
+            from app.mcp_client import init_mcp_client
+            mcp_tools = await init_mcp_client(
+                MCP_CLIENT_CONFIG_PATH,
+                fetch_timeout=MCP_CLIENT_FETCH_TIMEOUT,
+            )
+            if mcp_tools:
+                logger.info(f"MCP client loaded {len(mcp_tools)} external tools")
+        except Exception as e:
+            logger.warning(f"MCP client init failed: {e}")
+    else:
+        logger.info("MCP client disabled (MCP_CLIENT_ENABLED=false)")
+
+    # Build the graph with persistent checkpointer + any MCP tools
+    from app.config import BOB_ROUTING_ENABLED
     try:
         import aiosqlite
         conn = await aiosqlite.connect(CHECKPOINT_DB_PATH)
         checkpointer = AsyncSqliteSaver(conn)
-        _graph = build_graph(checkpointer=checkpointer)
-        logger.info(f"LangGraph agent built with persistent threads at {CHECKPOINT_DB_PATH}. BOB is online.")
     except Exception as e:
         logger.warning(f"Persistent checkpointer failed ({e}), falling back to in-memory")
         from langgraph.checkpoint.memory import MemorySaver
-        _graph = build_graph(checkpointer=MemorySaver())
-        logger.info("LangGraph agent built with in-memory checkpointer. BOB is online.")
+        checkpointer = MemorySaver()
+
+    if BOB_ROUTING_ENABLED:
+        _tiered_graphs = build_tiered_graphs(checkpointer=checkpointer, extra_tools=mcp_tools)
+        _graph = _tiered_graphs["heavy"]  # fallback for non-chat endpoints
+        logger.info(f"Tiered routing enabled: {list(_tiered_graphs.keys())} graphs built. BOB is online.")
+    else:
+        _graph = build_graph(checkpointer=checkpointer, extra_tools=mcp_tools)
+        logger.info("Single-model mode (routing disabled). BOB is online.")
 
     # Start scheduler
     try:
@@ -144,9 +177,31 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Recovery monitor not started: {e}")
 
+    # Start MCP server (expose BOB's capabilities to other AI clients)
+    if MCP_SERVER_ENABLED:
+        try:
+            from app.mcp_server import start_mcp_server
+            await start_mcp_server(port=MCP_SERVER_PORT, transport=MCP_SERVER_TRANSPORT)
+        except Exception as e:
+            logger.warning(f"MCP server not started: {e}")
+    else:
+        logger.info("MCP server disabled (MCP_SERVER_ENABLED=false)")
+
     yield
 
     logger.info("BOB is shutting down.")
+
+    # Cleanup MCP client + server
+    try:
+        from app.mcp_client import close_mcp_client
+        await close_mcp_client()
+    except Exception as e:
+        logger.warning(f"MCP client cleanup error: {e}")
+    try:
+        from app.mcp_server import stop_mcp_server
+        await stop_mcp_server()
+    except Exception as e:
+        logger.warning(f"MCP server cleanup error: {e}")
 
 
 app = FastAPI(title="BOB — Bound Operational Brain", version="1.0.0", lifespan=lifespan)
@@ -158,16 +213,32 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Dashboard API proxy (must come before static mount)
+from app.dashboard_api import router as dashboard_api_router
+app.include_router(dashboard_api_router)
+
+# Dashboard static files (React SPA)
+import os as _os
+_dashboard_dir = "/app/dashboard/dist"
+if _os.path.isdir(_dashboard_dir):
+    from fastapi.staticfiles import StaticFiles
+    app.mount("/dashboard", StaticFiles(directory=_dashboard_dir, html=True), name="dashboard")
+    logger.info(f"Dashboard mounted at /dashboard from {_dashboard_dir}")
+
 
 class ChatRequest(BaseModel):
     message: str
     thread_id: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
 
 
 class ChatResponse(BaseModel):
     response: str
     thread_id: str
     tool_calls: list[dict] | None = None
+    model_tier: str | None = None
+    model_used: str | None = None
 
 
 @app.get("/health")
@@ -198,6 +269,16 @@ async def health():
         breakers = all_status()
         if breakers:
             result["circuit_breakers"] = breakers
+    except Exception:
+        pass
+    try:
+        from app.cost_tracker import status_summary
+        result["cost"] = status_summary()
+    except Exception:
+        pass
+    try:
+        from app.loop_detector import all_threads_summary
+        result["loop_detector"] = all_threads_summary()
     except Exception:
         pass
     return result
@@ -233,10 +314,65 @@ async def chat(req: ChatRequest, request: Request):
             headers={"Retry-After": str(info.get("retry_after", 3600))},
         )
 
+    # Cost budget guard — abort before BOB even calls the LLM if over budget.
+    # Identifies the user from the request (real auth integration to come;
+    # for now we use the client IP as a coarse user identifier on /chat).
+    try:
+        from app.cost_tracker import check_budget
+        user_identifier = client_ip
+        budget_check = check_budget(user_identifier)
+        if not budget_check["allowed"]:
+            raise HTTPException(
+                status_code=429,
+                detail=f"Budget guard: {budget_check['reason']}",
+                headers={
+                    "X-Budget-Daily-Spend": str(budget_check["daily_spend"]),
+                    "X-Budget-Daily-Limit": str(budget_check["daily_budget"]),
+                },
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Cost tracker should never block BOB if it has internal errors —
+        # log and continue. Production hardening means failing OPEN on
+        # this kind of advisory check, not closed.
+        logger.warning(f"Cost tracker error (non-fatal): {e}")
+
     thread_id = req.thread_id
     if not thread_id:
         _thread_counter += 1
         thread_id = f"chat-{_thread_counter}-{int(time.time())}"
+
+    # Track user session
+    try:
+        from app.user_sessions import open_session, update_session
+        # Identify user: CF Zero Trust header > CF JWT email claim > IP fallback
+        user_email = (
+            request.headers.get("cf-access-authenticated-user-email")
+            or request.headers.get("Cf-Access-Authenticated-User-Email")
+        )
+        user_name = None
+        user_role = "guest"
+        if user_email:
+            user_name = user_email.split("@")[0]
+            # Check if this is Rob
+            from app.config import BOB_LLM_PROVIDER  # just to confirm config loads
+            rob_emails = {"robert.colling@gmail.com", "rob@appalachiantoysgames.com"}
+            user_role = "rob" if user_email.lower() in rob_emails else "member"
+        open_session(
+            session_id=thread_id,
+            endpoint="chat",
+            user_email=user_email or client_ip,
+            user_name=user_name or client_ip,
+            user_role=user_role,
+            client_ip=client_ip,
+            latitude=req.latitude,
+            longitude=req.longitude,
+        )
+        update_session(thread_id, increment_messages=True,
+                       latitude=req.latitude, longitude=req.longitude)
+    except Exception as e:
+        logger.warning(f"Session tracking error (non-fatal): {e}")
 
     config = {"configurable": {"thread_id": thread_id}}
 
@@ -245,9 +381,34 @@ async def chat(req: ChatRequest, request: Request):
     if langfuse:
         config["callbacks"] = [langfuse]
 
+    # ── Route to the right tier ──────────────────────────────────────────
+    tier_used = None
+    model_used = None
+
+    if _tiered_graphs:
+        from app.router import classify, get_tier_model, Tier
+        from app.config import BOB_LLM_PROVIDER, BOB_LLM_API_KEY, BOB_MODEL_LIGHT, BOB_MODEL_HEAVY
+
+        decision = await classify(req.message, BOB_LLM_PROVIDER, BOB_LLM_API_KEY)
+        tier_used = decision.tier.value
+        model_used = get_tier_model(
+            decision.tier, BOB_LLM_PROVIDER,
+            BOB_MODEL_LIGHT if decision.tier == Tier.LIGHT else BOB_MODEL_HEAVY,
+        )
+        graph = _tiered_graphs[tier_used]
+        logger.info(f"[{thread_id}] Routed to {tier_used} ({model_used}): {decision.reason}")
+    else:
+        graph = _graph
+
+    # Inject browser geolocation into the message if provided
+    user_message = req.message
+    if req.latitude is not None and req.longitude is not None:
+        location_note = f"[USER_LOCATION: lat={req.latitude}, lon={req.longitude}]\n"
+        user_message = location_note + user_message
+
     try:
-        result = await _graph.ainvoke(
-            {"messages": [{"role": "user", "content": req.message}]},
+        result = await graph.ainvoke(
+            {"messages": [{"role": "user", "content": user_message}]},
             config=config,
         )
     except Exception as e:
@@ -274,7 +435,30 @@ async def chat(req: ChatRequest, request: Request):
         response=response_text,
         thread_id=thread_id,
         tool_calls=tool_calls or None,
+        model_tier=tier_used,
+        model_used=model_used,
     )
+
+
+# ── Router status ─────────────────────────────────────────────────────────
+
+@app.get("/router/status")
+async def router_status():
+    """Show routing configuration and tier-to-model mapping."""
+    from app.config import BOB_ROUTING_ENABLED, BOB_LLM_PROVIDER, BOB_MODEL_LIGHT, BOB_MODEL_HEAVY
+
+    result = {"enabled": BOB_ROUTING_ENABLED}
+    if BOB_ROUTING_ENABLED:
+        from app.router import Tier, get_tier_model
+        result["provider"] = BOB_LLM_PROVIDER
+        result["tiers"] = {
+            tier.value: get_tier_model(
+                tier, BOB_LLM_PROVIDER,
+                BOB_MODEL_LIGHT if tier == Tier.LIGHT else BOB_MODEL_HEAVY,
+            )
+            for tier in Tier
+        }
+    return result
 
 
 # ── Memory proposal endpoints ──────────────────────────────────────────────
@@ -311,6 +495,323 @@ async def proposals_history(limit: int = 20):
     """Recent proposal history."""
     from app.memory_proposals import get_history
     return {"proposals": get_history(limit)}
+
+
+# ── A2A protocol endpoints (Agent-to-Agent federation) ─────────────────────
+
+@app.get("/a2a/.well-known/agent.json")
+async def a2a_agent_card_endpoint(request: Request):
+    """A2A discovery endpoint. Peer agents fetch this to learn what BOB can do."""
+    from app.a2a import agent_card
+    # Build the public URL from the request so peers know how to reach us
+    public_url = str(request.base_url).rstrip("/")
+    return agent_card(public_url=public_url)
+
+
+@app.post("/a2a/message")
+async def a2a_message_endpoint(payload: dict, request: Request):
+    """Receive an A2A message from a peer agent and dispatch to a BOB skill."""
+    from app.a2a import handle_message
+    skill = payload.get("skill", "")
+    input_obj = payload.get("input", {}) or {}
+    input_text = input_obj.get("text", "") if isinstance(input_obj, dict) else str(input_obj)
+    if not skill or not input_text:
+        raise HTTPException(status_code=400, detail="payload must include 'skill' and 'input.text'")
+
+    # Optional bearer auth
+    auth_header = request.headers.get("authorization", "")
+    auth_token = None
+    if auth_header.lower().startswith("bearer "):
+        auth_token = auth_header[7:].strip()
+
+    task = await handle_message(skill, input_text, auth_token=auth_token)
+    return task.to_dict()
+
+
+@app.get("/a2a/task/{task_id}")
+async def a2a_task_status(task_id: str):
+    """Look up a previously-submitted A2A task by ID."""
+    from app.a2a import get_task
+    task = get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail=f"task {task_id} not found")
+    return task.to_dict()
+
+
+@app.get("/a2a/status")
+async def a2a_status_endpoint():
+    """A2A configuration and recent task summary."""
+    from app.a2a import status, list_recent_tasks
+    return {
+        "config": status(),
+        "recent_tasks": list_recent_tasks(limit=10),
+    }
+
+
+@app.get("/a2a/peers")
+async def a2a_peers_endpoint():
+    """Discover the agent cards of all configured A2A peers."""
+    from app.a2a import discover_peers
+    return await discover_peers()
+
+
+# ── Replay endpoints (deterministic audit log replay) ──────────────────────
+
+@app.get("/replay/audit/{audit_id}")
+async def replay_audit_entry(audit_id: str, include_writes: bool = False,
+                              dry_run: bool = True):
+    """Replay a single audit log entry by its short ID.
+
+    Default is dry_run=True (returns what the replay WOULD do without
+    invoking the tool). Pass dry_run=false to actually execute.
+    Default is include_writes=False — write tools (create_task, send_message,
+    notify_rob, etc.) are skipped to avoid duplicating side effects.
+    """
+    from app.replay import replay_by_id
+    return await replay_by_id(audit_id, include_writes=include_writes, dry_run=dry_run)
+
+
+@app.get("/replay/recent")
+async def replay_recent_endpoint(tool: str = "", limit: int = 10,
+                                  include_writes: bool = False, dry_run: bool = True):
+    """Replay the most recent N audit entries.
+
+    Args:
+        tool: Filter to a specific tool name (e.g., 'check_email')
+        limit: Number of entries to replay (default 10)
+        include_writes: Allow replay of write tools (default false)
+        dry_run: Don't actually invoke tools (default true)
+    """
+    from app.replay import replay_recent
+    return await replay_recent(
+        tool_filter=tool or None,
+        limit=limit,
+        include_writes=include_writes,
+        dry_run=dry_run,
+    )
+
+
+# ── Personality endpoints ──────────────────────────────────────────────────
+
+@app.get("/personality/status")
+async def personality_status_endpoint():
+    """Show which personality variant BOB is using and what other variants
+    are available. Set BOB_PERSONALITY env var and restart to switch.
+    """
+    from app.personality import status
+    return status()
+
+
+# ── Memory export / import endpoints ───────────────────────────────────────
+
+@app.get("/memory/export")
+async def memory_export(collections: str = ""):
+    """Export memory as JSON. Optional `collections` query param is a
+    comma-separated list of collection names; default exports all.
+
+    The output can be saved and later imported into another BOB instance
+    via POST /memory/import. The format is portable across vector DB
+    implementations because it includes only text and metadata, not
+    embeddings.
+    """
+    from app.memory import export_all
+    target = [c.strip() for c in collections.split(",") if c.strip()] if collections else None
+    return export_all(target)
+
+
+@app.post("/memory/import")
+async def memory_import(data: dict, mode: str = "merge"):
+    """Import a previously-exported memory dump.
+
+    Modes:
+        - merge (default): upsert each entry, existing IDs get overwritten
+        - replace: wipe each target collection first, then import (destructive)
+
+    Pass the export dict in the request body. To import a file from disk,
+    use the orchestrator container shell:
+        docker exec atg-bob python -c "from app.memory import import_from_file; print(import_from_file('/app/data/snapshot.json'))"
+    """
+    from app.memory import import_all
+    if mode not in ("merge", "replace"):
+        raise HTTPException(status_code=400, detail="mode must be 'merge' or 'replace'")
+    return import_all(data, mode=mode)
+
+
+# ── Cost tracking endpoints ────────────────────────────────────────────────
+
+@app.get("/cost/status")
+async def cost_status():
+    """Current cost spend, budget remaining, and breakdown by user/model."""
+    from app.cost_tracker import status_summary, get_breakdown
+    return {
+        "summary": status_summary(),
+        "last_7_days": get_breakdown(days=7),
+    }
+
+
+@app.get("/cost/check/{user}")
+async def cost_check_user(user: str):
+    """Check if a specific user is within their budget."""
+    from app.cost_tracker import check_budget
+    return check_budget(user)
+
+
+# ── Photo intake (smartphone vision) ──────────────────────────────────────
+# These endpoints are intended to be reached via the voice service proxy
+# (which handles auth). LAN-internal — do not expose to the public CF tunnel.
+
+@app.post("/photos/upload")
+async def photos_upload(
+    file: UploadFile = File(...),
+    prompt: str = Form(""),
+    mode: str = Form("analyze"),
+    user: str = Form("anonymous"),
+):
+    """Upload a photo, run vision, return the analysis. Photo is held in
+    a temp dir and auto-purges in PHOTO_TEMP_TTL_SECONDS unless the caller
+    POSTs to /photos/remember/{photo_id}.
+    """
+    from app import photo_intake
+    from app.cost_tracker import check_budget, check_vision_budget
+    from app.firewall import gate, FirewallDecision
+
+    # Firewall + budget guards
+    fw = gate("upload_photo", {"prompt": prompt[:500], "mode": mode}, thread_id=f"photo:{user}")
+    if fw.decision in (FirewallDecision.DENY_INJECTION, FirewallDecision.DENY_LOOP):
+        raise HTTPException(status_code=403, detail=f"firewall: {fw.reason}")
+
+    budget = check_budget(user)
+    if not budget["allowed"]:
+        raise HTTPException(status_code=429, detail=budget["reason"])
+    vbudget = check_vision_budget(user)
+    if not vbudget["allowed"]:
+        raise HTTPException(status_code=429, detail=vbudget["reason"])
+
+    image_bytes = await file.read()
+    mimetype = (file.content_type or "image/jpeg").lower()
+
+    try:
+        result = await photo_intake.process_photo(
+            image_bytes=image_bytes,
+            mimetype=mimetype,
+            user=user,
+            prompt=prompt,
+            mode=mode,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception("photo upload failed")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return result
+
+
+@app.post("/photos/remember/{photo_id}")
+async def photos_remember(photo_id: str, user: str = Form("anonymous")):
+    """Persist a temp photo so BOB can recall it later."""
+    from app import photo_intake
+    result = photo_intake.remember_photo(photo_id, user)
+    if not result.get("ok"):
+        raise HTTPException(status_code=404, detail=result.get("error", "not found"))
+    return result
+
+
+@app.get("/photos/recent")
+async def photos_recent(user: str = "", limit: int = 10):
+    """List recent persisted photos. Without ?user= returns across all users."""
+    from app import photo_intake
+    return {"photos": photo_intake.list_recent(user=user or None, limit=limit)}
+
+
+@app.get("/photos/{photo_id}")
+async def photos_get(photo_id: str):
+    """Get the metadata + analysis for a single photo."""
+    from app import photo_intake
+    rec = photo_intake.get_photo_record(photo_id)
+    if not rec:
+        raise HTTPException(status_code=404, detail="photo not found")
+    rec.pop("path", None)  # don't leak filesystem path
+    return rec
+
+
+# ── LLM provider introspection ─────────────────────────────────────────────
+
+@app.get("/llm/status")
+async def llm_status():
+    """Show which LLM provider BOB is using and which providers are available.
+
+    Useful for the dashboard, debugging "why isn't BOB responding," and
+    confirming you actually swapped providers when you thought you did.
+    """
+    from app.llm import list_providers
+    from app.config import (BOB_LLM_PROVIDER, BOB_MODEL, BOB_LLM_MAX_TOKENS,
+                            BOB_LLM_BASE_URL)
+
+    return {
+        "active": {
+            "provider": BOB_LLM_PROVIDER,
+            "model": BOB_MODEL or "(provider default)",
+            "max_tokens": BOB_LLM_MAX_TOKENS,
+            "base_url": BOB_LLM_BASE_URL or "(provider default)",
+        },
+        "providers": list_providers(),
+    }
+
+
+# ── MCP introspection endpoints ────────────────────────────────────────────
+
+@app.get("/mcp/status")
+async def mcp_status():
+    """Show the status of MCP integration — both client and server.
+
+    Useful for the dashboard and for debugging which MCP tools BOB has access
+    to and which capabilities he's exposing to other clients.
+    """
+    result = {
+        "client": {
+            "enabled": MCP_CLIENT_ENABLED,
+            "config_path": MCP_CLIENT_CONFIG_PATH,
+            "loaded_tools": [],
+        },
+        "server": {
+            "enabled": MCP_SERVER_ENABLED,
+            "port": MCP_SERVER_PORT,
+            "transport": MCP_SERVER_TRANSPORT,
+        },
+    }
+
+    if MCP_CLIENT_ENABLED:
+        try:
+            from app.mcp_client import get_loaded_tool_names
+            result["client"]["loaded_tools"] = get_loaded_tool_names()
+            result["client"]["tool_count"] = len(result["client"]["loaded_tools"])
+        except Exception as e:
+            result["client"]["error"] = str(e)
+
+    return result
+
+
+@app.get("/mcp/tools")
+async def mcp_tools_list():
+    """List all MCP tools currently available to BOB, with their source server."""
+    if not MCP_CLIENT_ENABLED:
+        return {"tools": [], "note": "MCP client disabled"}
+    try:
+        from app.mcp_client import get_loaded_tools
+        tools = get_loaded_tools()
+        return {
+            "tools": [
+                {
+                    "name": getattr(t, "name", "?"),
+                    "description": getattr(t, "description", "")[:200],
+                }
+                for t in tools
+            ],
+            "count": len(tools),
+        }
+    except Exception as e:
+        return {"tools": [], "error": str(e)}
 
 
 # ── Recovery endpoints ─────────────────────────────────────────────────────

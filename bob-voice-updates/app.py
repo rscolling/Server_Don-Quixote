@@ -184,12 +184,85 @@ def _build_user_context(user: UserIdentity) -> str:
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "bob-voice", "multi_user": True}
+    from auth import status as auth_status
+    return {
+        "status": "ok",
+        "service": "bob-voice",
+        "multi_user": True,
+        "auth": auth_status(),
+    }
+
+
+@app.get("/auth/status")
+async def auth_status_endpoint():
+    """Show which auth backend is active and which are configured.
+
+    Useful for verifying the auth abstraction is set up correctly without
+    actually authenticating a user.
+    """
+    from auth import status
+    return status()
 
 
 @app.get("/")
-async def index():
+async def root():
+    # Default landing — three buttons (Talk / Chat / Photo).
+    return FileResponse("static/landing.html", headers={"Cache-Control": "no-cache, no-store"})
+
+
+@app.get("/landing")
+async def landing():
+    return FileResponse("static/landing.html", headers={"Cache-Control": "no-cache, no-store"})
+
+
+@app.get("/voice")
+async def voice_page():
     return FileResponse("static/index.html", headers={"Cache-Control": "no-cache, no-store"})
+
+
+@app.get("/photos")
+async def photos_page():
+    return FileResponse("static/photos.html", headers={"Cache-Control": "no-cache, no-store"})
+
+
+@app.post("/photos/upload")
+async def photos_upload_proxy(request: Request):
+    """Auth-gated proxy: validates JWT, then forwards multipart to BOB orchestrator."""
+    user = await identify_user(dict(request.headers))
+    if user.role == UserRole.GUEST:
+        return {"error": "photo upload requires authentication"}, 401
+
+    body = await request.body()
+    headers = {
+        "Content-Type": request.headers.get("content-type", "multipart/form-data"),
+    }
+    # Forward as-is, but inject the user identity as a form field via header hint.
+    # Simpler: re-read the multipart form, add 'user' field, re-post.
+    form = await request.form()
+    files = {}
+    data = {"user": user.email or user.display_name or "anonymous"}
+    for key, value in form.multi_items():
+        if hasattr(value, "filename"):
+            files[key] = (value.filename, await value.read(), value.content_type)
+        else:
+            data[key] = value
+
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        resp = await client.post(f"{BOB_URL}/photos/upload", data=data, files=files)
+    return resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {"error": resp.text}
+
+
+@app.post("/photos/remember/{photo_id}")
+async def photos_remember_proxy(photo_id: str, request: Request):
+    user = await identify_user(dict(request.headers))
+    if user.role == UserRole.GUEST:
+        return {"error": "auth required"}, 401
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.post(
+            f"{BOB_URL}/photos/remember/{photo_id}",
+            data={"user": user.email or user.display_name or "anonymous"},
+        )
+    return resp.json()
 
 
 @app.get("/manifest.json")
@@ -230,12 +303,17 @@ async def transcribe_audio(audio_data: bytes) -> str:
     return transcript
 
 
-async def ask_bob(message: str, thread_id: str) -> str:
+async def ask_bob(message: str, thread_id: str,
+                  latitude: float = None, longitude: float = None) -> str:
     """Send message to BOB (non-streaming fallback)."""
+    body = {"message": message, "thread_id": thread_id}
+    if latitude is not None and longitude is not None:
+        body["latitude"] = latitude
+        body["longitude"] = longitude
     async with httpx.AsyncClient(timeout=120.0) as client:
         resp = await client.post(
             f"{BOB_URL}/chat",
-            json={"message": message, "thread_id": thread_id},
+            json=body,
         )
         resp.raise_for_status()
         data = resp.json()
@@ -261,7 +339,8 @@ _SENTENCE_RE = re.compile(r'(?<=[.!?])\s+')
 
 
 async def stream_bob_and_speak(message: str, thread_id: str, ws: WebSocket,
-                                stop_event: asyncio.Event) -> str:
+                                stop_event: asyncio.Event,
+                                latitude: float = None, longitude: float = None) -> str:
     """Stream BOB's response via SSE, generate TTS per sentence, send audio as each is ready."""
     full_text = ""
     buffer = ""
@@ -284,10 +363,14 @@ async def stream_bob_and_speak(message: str, thread_id: str, ws: WebSocket,
 
     try:
         async with httpx.AsyncClient(timeout=120.0) as client:
+            body = {"message": message, "thread_id": thread_id}
+            if latitude is not None and longitude is not None:
+                body["latitude"] = latitude
+                body["longitude"] = longitude
             async with client.stream(
                 "POST",
                 f"{BOB_URL}/chat/stream",
-                json={"message": message, "thread_id": thread_id},
+                json=body,
             ) as resp:
                 resp.raise_for_status()
                 async for line in resp.aiter_lines():
@@ -320,7 +403,7 @@ async def stream_bob_and_speak(message: str, thread_id: str, ws: WebSocket,
     except httpx.HTTPStatusError as e:
         if e.response.status_code == 404:
             logger.info("Streaming not available, falling back to /chat")
-            full_text = await ask_bob(message, thread_id)
+            full_text = await ask_bob(message, thread_id, latitude=latitude, longitude=longitude)
             if not stop_event.is_set():
                 audio_bytes = await asyncio.to_thread(_generate_tts_full, full_text)
                 cache_key = _tts_cache_key(full_text)
@@ -333,7 +416,7 @@ async def stream_bob_and_speak(message: str, thread_id: str, ws: WebSocket,
         raise
     except Exception:
         logger.exception("Streaming error, falling back to /chat")
-        full_text = await ask_bob(message, thread_id)
+        full_text = await ask_bob(message, thread_id, latitude=latitude, longitude=longitude)
         if not stop_event.is_set():
             audio_bytes = await asyncio.to_thread(_generate_tts_full, full_text)
             await ws.send_bytes(audio_bytes)
@@ -364,12 +447,31 @@ async def voice_endpoint(ws: WebSocket):
     stop_event = asyncio.Event()
     msg_queue = asyncio.Queue()
     user_context = _build_user_context(user)
+    user_location = {"lat": None, "lon": None}
 
     # Per-session rate limiting
     rate_limit = WS_RATE_LIMIT if user.role != UserRole.GUEST else WS_GUEST_RATE_LIMIT
     message_timestamps: list[float] = []
 
     logger.info(f"Voice session started: {thread_id} | user: {user.display_name} ({user.role.value})")
+
+    # Track session on BOB dashboard
+    async def _track_session(action: str, **kwargs):
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as c:
+                await c.post(f"{BOB_URL}/dashboard/api/sessions/{action}", json=kwargs)
+        except Exception as e:
+            logger.debug(f"Session tracking ({action}) failed: {e}")
+
+    client_ip = headers.get("cf-connecting-ip", headers.get("x-forwarded-for", "unknown"))
+    await _track_session("open",
+        session_id=thread_id,
+        endpoint="voice",
+        user_email=user.email or client_ip,
+        user_name=user.display_name or client_ip,
+        user_role=user.role.value,
+        client_ip=client_ip,
+    )
 
     # Tell the client who they are
     await ws.send_json({
@@ -393,6 +495,15 @@ async def voice_endpoint(ws: WebSocket):
                         stop_event.set()
                         thread_id = f"voice-{user.role.value}-{uuid.uuid4().hex[:8]}"
                         await ws.send_json({"type": "status", "message": "New conversation started"})
+                    elif msg.get("type") == "location":
+                        user_location["lat"] = msg.get("lat")
+                        user_location["lon"] = msg.get("lon")
+                        logger.info(f"Received geolocation for {user.display_name}: {user_location}")
+                        await _track_session("update",
+                            session_id=thread_id,
+                            latitude=user_location["lat"],
+                            longitude=user_location["lon"],
+                        )
                     elif msg.get("type") == "ping":
                         await ws.send_json({"type": "pong"})
                     else:
@@ -458,13 +569,19 @@ async def voice_endpoint(ws: WebSocket):
                         logger.info(f"Injected conversation memory for {user.display_name}")
                     is_first_message = False
 
+                # Inject browser geolocation if available
+                if user_location["lat"] is not None and user_location["lon"] is not None:
+                    location_note = f"[USER_LOCATION: lat={user_location['lat']}, lon={user_location['lon']}]\n"
+                    message_to_send = location_note + message_to_send
+
                 # Stream BOB response
                 stop_event.clear()
                 await ws.send_json({"type": "status", "message": "BOB is thinking..."})
                 await ws.send_json({"type": "audio_start"})
 
                 bob_response = await stream_bob_and_speak(
-                    message_to_send, thread_id, ws, stop_event
+                    message_to_send, thread_id, ws, stop_event,
+                    latitude=user_location["lat"], longitude=user_location["lon"],
                 )
 
                 logger.info(f"BOB response to {user.display_name}: {bob_response[:100]}...")
@@ -475,6 +592,7 @@ async def voice_endpoint(ws: WebSocket):
                 await asyncio.to_thread(
                     store_voice_exchange, transcript, bob_response, thread_id, user
                 )
+                await _track_session("update", session_id=thread_id, increment_messages=True)
 
                 if stop_event.is_set():
                     stop_event.clear()
@@ -489,6 +607,7 @@ async def voice_endpoint(ws: WebSocket):
             pass
     finally:
         listener.cancel()
+        await _track_session("close", session_id=thread_id)
 
 
 app.mount("/static", StaticFiles(directory="static"), name="static")

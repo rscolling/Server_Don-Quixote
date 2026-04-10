@@ -5,6 +5,10 @@ credentials.json
 token.json
 gmail_token.json
 gmail_credentials.json
+# MCP server config — may contain bearer tokens for upstream MCP servers
+bob-orchestrator/mcp_servers.json
+mcp_servers.json
+!bob-orchestrator/mcp_servers.example.json
 
 # Data
 data/

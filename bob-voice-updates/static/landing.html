@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="BOB">
+<title>BOB</title>
+<link rel="manifest" href="/manifest.json">
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --bg-2: #16213e;
+    --fg: #e6e6e6;
+    --muted: #8a8aa0;
+    --atg: #4a9d4a;
+    --atg-2: #5fb85f;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; min-height: 100vh; background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+  body { display: flex; flex-direction: column; align-items: center;
+    justify-content: center; padding: env(safe-area-inset-top) 24px env(safe-area-inset-bottom); }
+  .header { text-align: center; margin-bottom: 40px; }
+  .logo { font-size: 64px; font-weight: 800; color: var(--atg-2);
+    letter-spacing: -0.02em; margin: 0; line-height: 1; }
+  .tagline { color: var(--muted); margin-top: 8px; font-size: 14px;
+    text-transform: uppercase; letter-spacing: 0.1em; }
+  .buttons { display: flex; flex-direction: column; gap: 16px; width: 100%;
+    max-width: 360px; }
+  .big-btn { display: flex; align-items: center; gap: 16px; padding: 22px 24px;
+    background: var(--bg-2); border: 1px solid #2a2f55; border-radius: 16px;
+    color: var(--fg); text-decoration: none; cursor: pointer; transition: transform 0.1s;
+    font-size: 18px; font-weight: 600; }
+  .big-btn:active { transform: scale(0.98); }
+  .big-btn .icon { width: 56px; height: 56px; border-radius: 14px;
+    background: var(--atg); display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; }
+  .big-btn .icon svg { width: 28px; height: 28px; color: white; }
+  .big-btn .label { display: flex; flex-direction: column; align-items: flex-start; }
+  .big-btn .sub { color: var(--muted); font-size: 13px; font-weight: 400;
+    margin-top: 2px; }
+  .footer { margin-top: 40px; color: var(--muted); font-size: 12px; text-align: center; }
+  .footer a { color: var(--atg-2); text-decoration: none; }
+  .install-hint { display: none; max-width: 360px; padding: 12px 14px;
+    background: #2a2f55; border-radius: 10px; margin-top: 24px; font-size: 13px;
+    color: var(--fg); }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1 class="logo">BOB</h1>
+  <p class="tagline">Bound Operational Brain</p>
+</div>
+
+<div class="buttons">
+  <a class="big-btn" href="/voice">
+    <div class="icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+        <line x1="12" y1="19" x2="12" y2="23"/>
+        <line x1="8" y1="23" x2="16" y2="23"/>
+      </svg>
+    </div>
+    <div class="label">Talk to BOB
+      <span class="sub">Real-time voice conversation</span>
+    </div>
+  </a>
+
+  <a class="big-btn" href="https://appalachiantoysgames.com#chat">
+    <div class="icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+    </div>
+    <div class="label">Chat with BOB
+      <span class="sub">Type a question, get an answer</span>
+    </div>
+  </a>
+
+  <a class="big-btn" href="/photos">
+    <div class="icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+        <circle cx="12" cy="13" r="4"/>
+      </svg>
+    </div>
+    <div class="label">Send Photo to BOB
+      <span class="sub">Whiteboards, notes, products, anything</span>
+    </div>
+  </a>
+</div>
+
+<div class="install-hint" id="iosHint">
+  📱 Tap <strong>Share</strong> then <strong>Add to Home Screen</strong> to install BOB.
+</div>
+
+<div class="footer">
+  Powered by <a href="https://appalachiantoysgames.com">Appalachian Toys &amp; Games</a>
+</div>
+
+<script>
+// One-time iOS install hint
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+                     || window.navigator.standalone;
+if (isIOS && !isStandalone && !localStorage.getItem('bobInstallHintShown')) {
+  document.getElementById('iosHint').style.display = 'block';
+  localStorage.setItem('bobInstallHintShown', '1');
+}
+
+// Android install prompt
+let deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  const hint = document.getElementById('iosHint');
+  hint.innerHTML = '📱 <button style="background:var(--atg);color:white;border:none;padding:6px 12px;border-radius:6px;font-weight:600;">Install BOB</button>';
+  hint.style.display = 'block';
+  hint.querySelector('button').addEventListener('click', async () => {
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    hint.style.display = 'none';
+  });
+});
+</script>
+</body>
+</html>

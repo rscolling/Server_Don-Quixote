@@ -1,0 +1,102 @@
+# Idea Parking Lot
+### *Future projects, half-formed thoughts, things worth revisiting*
+### *BOB monitors this file. You own it.*
+
+> **This is a TEMPLATE.** Copy this file to `IDEA_PARKING_LOT.md` and use it as your personal idea queue. The real `IDEA_PARKING_LOT.md` is gitignored so it never leaks to the public repo.
+
+---
+
+> **How this works:** Drop ideas here in any state — rough, half-baked, or fully formed.
+> Nothing in this file is a commitment. It's a holding pen.
+> BOB reviews it during project planning and flags anything worth activating.
+> You make all final calls on what moves from here to `MISSION.md`.
+
+---
+
+## Active Parking Lot
+
+### IDEA — [Short title]
+**Added:** YYYY-MM-DD
+**Source:** [You / BOB suggestion / a customer / an agent]
+**Status:** Parked
+
+**The idea:**
+[One paragraph. What is it?]
+
+**Why it might be worth doing:**
+[Strategic fit, revenue potential, addressed pain point, alignment with mission, etc.]
+
+**What it would need:**
+[Rough sense of effort — time, money, dependencies, skills]
+
+**Open questions:**
+[What do we not know yet that matters?]
+
+**BOB notes:**
+*(BOB appends observations here when relevant signals emerge — competitor moves, user feedback, technical breakthroughs, etc.)*
+
+---
+
+### IDEA — [Another idea]
+**Added:** YYYY-MM-DD
+**Source:** [Source]
+**Status:** Parked
+
+**The idea:**
+[Description]
+
+**Why it might be worth doing:**
+[Reasoning]
+
+**What it would need:**
+[Effort estimate]
+
+**Open questions:**
+[Unknowns]
+
+**BOB notes:**
+*(empty)*
+
+---
+
+## Idea Template
+
+Copy this block for each new idea you add:
+
+```text
+### IDEA — [Short title]
+**Added:** YYYY-MM-DD
+**Source:** [you / BOB suggestion / a customer / etc.]
+**Status:** Parked
+
+**The idea:**
+[One paragraph. What is it?]
+
+**Why it might be worth doing:**
+[Strategic fit, revenue, addressed pain, alignment with mission, etc.]
+
+**What it would need:**
+[Rough effort estimate]
+
+**Open questions:**
+[Unknowns]
+
+**BOB notes:**
+*(empty)*
+```
+
+---
+
+## Archive — Ideas That Were Activated
+
+*When an idea moves to `MISSION.md` as an active project, move the entry here so you remember it came from this list.*
+
+| Idea | Activated | Became |
+|---|---|---|
+| [Idea name] | YYYY-MM-DD | [Project ID in MISSION.md] |
+
+---
+
+*This file lives at `bob_context/IDEA_PARKING_LOT.md`.*
+*BOB reads this during project planning sessions.*
+*Last updated: [date]*

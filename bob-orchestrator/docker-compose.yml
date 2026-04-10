@@ -4,7 +4,8 @@ services:
     container_name: atg-bob
     restart: unless-stopped
     ports:
-      - "8100:8100"
+      - "8100:8100"   # FastAPI orchestrator (chat, status, dashboard endpoints)
+      - "8108:8108"   # MCP server (BOB exposed as MCP — Claude Desktop, Cursor, etc.) — 8101-8104 reserved for debate arena
     env_file:
       - .env
     volumes:
@@ -12,6 +13,9 @@ services:
       - bob_data:/app/data
       - ./token.json:/app/gmail_token.json
       - ./credentials.json:/app/gmail_credentials.json:ro
+      # Optional MCP client config — touch the file before first start, even if empty:
+      #   touch mcp_servers.json && echo '[]' > mcp_servers.json
+      - ./mcp_servers.json:/app/data/mcp_servers.json:ro
     networks:
       - agent-net
     depends_on:
