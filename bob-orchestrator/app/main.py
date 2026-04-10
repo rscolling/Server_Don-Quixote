@@ -343,28 +343,24 @@ async def chat(req: ChatRequest, request: Request):
         _thread_counter += 1
         thread_id = f"chat-{_thread_counter}-{int(time.time())}"
 
+    # Identify user via pluggable auth backend
+    try:
+        from app.auth import identify_user
+        user = await identify_user(request)
+    except Exception as e:
+        logger.warning(f"Auth identification error (non-fatal): {e}")
+        from app.auth import GUEST
+        user = GUEST
+
     # Track user session
     try:
         from app.user_sessions import open_session, update_session
-        # Identify user: CF Zero Trust header > CF JWT email claim > IP fallback
-        user_email = (
-            request.headers.get("cf-access-authenticated-user-email")
-            or request.headers.get("Cf-Access-Authenticated-User-Email")
-        )
-        user_name = None
-        user_role = "guest"
-        if user_email:
-            user_name = user_email.split("@")[0]
-            # Check if this is Rob
-            from app.config import BOB_LLM_PROVIDER  # just to confirm config loads
-            rob_emails = {"robert.colling@gmail.com", "rob@appalachiantoysgames.com"}
-            user_role = "rob" if user_email.lower() in rob_emails else "member"
         open_session(
             session_id=thread_id,
             endpoint="chat",
-            user_email=user_email or client_ip,
-            user_name=user_name or client_ip,
-            user_role=user_role,
+            user_email=user.email or client_ip,
+            user_name=user.display_name or client_ip,
+            user_role=user.role.value,
             client_ip=client_ip,
             latitude=req.latitude,
             longitude=req.longitude,
@@ -831,6 +827,21 @@ async def dismiss_paused(task_id: str):
     if not removed:
         raise HTTPException(status_code=404, detail="Task not found")
     return {"status": "dismissed", "task_id": task_id}
+
+
+@app.get("/auth/status")
+async def auth_status():
+    """Show auth backend configuration and supported identity providers."""
+    from app.auth import status as _auth_status
+    return _auth_status()
+
+
+@app.get("/auth/me")
+async def auth_me(request: Request):
+    """Return the identity of the current caller. Useful for testing auth."""
+    from app.auth import identify_user
+    user = await identify_user(request)
+    return user.to_dict()
 
 
 @app.get("/status")

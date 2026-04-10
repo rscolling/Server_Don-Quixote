@@ -235,6 +235,28 @@ What's the competitive landscape — are there already agent tool marketplaces (
 
 ---
 
+### IDEA — Headless Unity on Ubuntu Server
+**Added:** 2026-04-10
+**Source:** Rob
+**Status:** Parked
+
+**The idea:**
+Install and run Unity game engine on the don-quixote Ubuntu server in headless/batch mode. This would let the agent team trigger Unity builds, run automated tests, and compile Bear Creek Trail (and future games) directly from the server — no need for Rob to be at his Windows workstation to kick off builds. Unity supports Linux headless mode for CI/CD pipelines, which means BOB or the engineering agents could initiate builds, run play-mode tests, and produce APK/IPA artifacts on demand.
+
+**Why it might be worth doing:**
+Build automation is a force multiplier. Right now every build requires Rob at his desk. A server-side Unity install means builds can happen overnight, on schedule, or triggered by the agent team after code changes. Pairs with the Google Play Console integration idea — agents could build, deploy, and monitor all in one pipeline. Also unlocks automated testing (Unity Test Framework in batch mode) which catches bugs before they reach a device.
+
+**What it would need:**
+Unity Hub CLI or direct Unity Editor install for Linux (Unity supports Ubuntu officially). Unity license activation in headless mode (requires a Unity Pro or Unity Build Server license for CI use — the free Personal license doesn't allow headless/batch builds). Sufficient disk space (~10-15 GB for editor + project). Research on whether the server's hardware can handle Unity builds (CPU-bound, no GPU needed for headless). Build scripts that the agent team can invoke. Artifact storage (Syncthing bridge or direct output to a shared volume).
+
+**Open questions:**
+Does the Unity Personal license allow headless batch builds, or is a Pro/Build Server license required? How much RAM and CPU do Unity Linux builds consume for a 2D mobile game? Can we use Unity's `-batchmode -nographics` flags on the current server hardware? Should we containerize the Unity install (Docker) or install it directly? How do we handle Unity version pinning to match the project? What's the licensing cost for Unity Build Server ($40/mo per seat as of 2025)?
+
+**BOB notes:**
+*(none yet)*
+
+---
+
 ## Idea Template
 
 Copy this block for each new idea:
