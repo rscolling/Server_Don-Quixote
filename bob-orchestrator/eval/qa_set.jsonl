@@ -1,0 +1,20 @@
+{"id": "brand_identity_1", "category": "brand_voice", "question": "What is ATG and what kind of brand is it?", "expected_facts": ["appalachian", "handcrafted", "heritage"], "forbidden_phrases": ["disrupt", "synergy", "pivot"]}
+{"id": "brand_colors_1", "category": "brand_voice", "question": "What are ATG's primary brand colors?", "expected_facts": ["green", "amber"]}
+{"id": "brand_tone_1", "category": "brand_voice", "question": "How should ATG brand copy sound — what's the tone?", "expected_facts": ["warm", "direct", "unpretentious"]}
+{"id": "brand_donts_1", "category": "brand_voice", "question": "Name three words or phrases ATG brand voice must never use.", "expected_facts": ["synergy", "leverage"]}
+{"id": "decision_primary_project", "category": "decisions", "question": "What is ATG's primary revenue project as of 2026?", "expected_facts": ["bear creek trail", "match", "mobile"]}
+{"id": "decision_platform_order", "category": "decisions", "question": "Which mobile platform ships first for Bear Creek Trail — Android or iOS, and why?", "expected_facts": ["android", "first", "ios"]}
+{"id": "decision_music_tool", "category": "decisions", "question": "What AI service does ATG use for music generation?", "expected_facts": ["suno"]}
+{"id": "product_bct_theme", "category": "product_specs", "question": "Describe the theme and art direction for Bear Creek Trail.", "expected_facts": ["black bear", "banjo", "appalachian"]}
+{"id": "product_bct_format", "category": "product_specs", "question": "What's the gameplay format for Bear Creek Trail?", "expected_facts": ["match", "3-row"]}
+{"id": "product_bct_engine", "category": "product_specs", "question": "What game engine is Bear Creek Trail built in?", "expected_facts": ["unity"]}
+{"id": "project01_status", "category": "project_context", "question": "What's the status of PROJECT-01?", "expected_facts": ["bear creek", "active", "priority"]}
+{"id": "project02_status", "category": "project_context", "question": "What's the status of PROJECT-02 and what domain does it run on?", "expected_facts": ["appalachiantoysgames.com", "website"]}
+{"id": "infra_firewall_tiers", "category": "infrastructure", "question": "What are BOB's three firewall risk tiers for tool calls?", "expected_facts": ["low", "medium", "high"]}
+{"id": "infra_bob_sole_writer", "category": "infrastructure", "question": "Which component is the sole ChromaDB writer, and how do debate-arena agents propose writes?", "expected_facts": ["bob", "propose"]}
+{"id": "infra_state_machine", "category": "infrastructure", "question": "List the task states in the message bus state machine.", "expected_facts": ["created", "assigned", "in_progress", "accepted", "closed"]}
+{"id": "infra_mcp_dual_role", "category": "infrastructure", "question": "BOB is both an MCP client and an MCP server — what does each role do?", "expected_facts": ["client", "server"]}
+{"id": "infra_personality", "category": "infrastructure", "question": "What is BOB's default personality tone described as?", "expected_facts": ["sardonic", "skull"]}
+{"id": "arena_agents", "category": "debate_arena", "question": "Name the debate-arena agent roles that sit on ports 8101 through 8107.", "expected_facts": ["pm", "ra", "ce", "qa", "se", "re", "fe"]}
+{"id": "arena_critic_infra", "category": "debate_arena", "question": "Who is the final critic in the debate tier for infrastructure and code tasks?", "expected_facts": ["re"]}
+{"id": "arena_critic_creative", "category": "debate_arena", "question": "Who is the final critic for creative work in the debate arena?", "expected_facts": ["qa"]}

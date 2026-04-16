@@ -31,6 +31,8 @@ from typing import Callable
 
 import httpx
 
+from eval.research_quality import run_research_quality
+
 
 # ── Task results ────────────────────────────────────────────────────────────
 
@@ -455,6 +457,24 @@ async def task_cost_efficiency(client, bob_url) -> TaskResult:
         )
 
 
+async def task_research_quality(client, bob_url) -> TaskResult:
+    """Task 11: Research quality. Runs the held-out Q&A set from qa_set.jsonl
+    and scores answer fact-coverage. Appends a record to history.jsonl for
+    regression tracking across retrieval changes (reranking, hybrid search,
+    GBrain swap-in, etc.). See research_quality.py for the scoring rubric."""
+    start = time.time()
+    result = await run_research_quality(client, bob_url)
+    duration = int((time.time() - start) * 1000)
+    return TaskResult(
+        name="research_quality",
+        score=result["score_10"],
+        passed=result["passed"],
+        notes=result["notes"],
+        duration_ms=duration,
+        tool_calls=result["tool_calls"],
+    )
+
+
 async def task_first_response(client, bob_url) -> TaskResult:
     """Task 10: Time to first response. Latency from message to first byte."""
     start = time.time()
@@ -505,6 +525,7 @@ TASKS: dict[str, Callable] = {
     "audit_trail": task_audit_trail,
     "cost_efficiency": task_cost_efficiency,
     "first_response": task_first_response,
+    "research_quality": task_research_quality,
 }
 
 
@@ -572,6 +593,10 @@ def format_text(scorecard: Scorecard) -> str:
 
 
 def main():
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
     parser = argparse.ArgumentParser(description="BOB Eval Runner")
     parser.add_argument("--url", default="http://localhost:8100", help="BOB orchestrator URL")
     parser.add_argument("--task", default=None, help=f"Run a single task. Options: {list(TASKS.keys())}")
