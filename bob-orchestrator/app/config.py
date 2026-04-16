@@ -19,7 +19,13 @@ BOB_LLM_API_KEY = os.getenv("BOB_LLM_API_KEY", "")  # Generic fallback if provid
 BOB_ROUTING_ENABLED = os.getenv("BOB_ROUTING_ENABLED", "true").lower() == "true"
 BOB_MODEL_LIGHT = os.getenv("BOB_MODEL_LIGHT", "")   # Empty = auto per provider
 BOB_MODEL_HEAVY = os.getenv("BOB_MODEL_HEAVY", "")   # Empty = auto per provider
+BOB_MODEL_DEEP = os.getenv("BOB_MODEL_DEEP", "")     # Deep-research tier (Opus). Empty = auto per provider
 BOB_CLASSIFIER_MAX_TOKENS = int(os.getenv("BOB_CLASSIFIER_MAX_TOKENS", "20"))
+
+# Deep-research ($$$ guardrail): daily cap on Opus-class spend.
+# Set to 0 to disable the model-specific cap (total daily budget still applies).
+DAILY_BUDGET_USD_OPUS = float(os.getenv("DAILY_BUDGET_USD_OPUS", "5.00"))
+OPUS_BUDGET_ALERT_FRACTION = float(os.getenv("OPUS_BUDGET_ALERT_FRACTION", "0.80"))
 
 # Provider-specific keys (each takes precedence over BOB_LLM_API_KEY for its provider)
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")

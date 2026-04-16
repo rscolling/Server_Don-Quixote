@@ -96,7 +96,7 @@ def build_mcp_server():
         """Search BOB's shared memory for relevant information.
 
         Args:
-            collection: One of brand_voice, decisions, research, product_specs, project_context
+            collection: One of brand_voice, decisions, research, product_specs, project_context, personal_research
             query: Natural language search query
             n_results: Max number of results to return (default 5)
         """
@@ -230,7 +230,7 @@ def build_mcp_server():
         only way external clients can add to BOB's knowledge base.
 
         Args:
-            collection: brand_voice, decisions, research, product_specs, project_context
+            collection: brand_voice, decisions, research, product_specs, project_context, personal_research
             doc_id: Unique identifier for the memory entry
             text: The content to store
             proposed_by: Who/what is proposing the write (for audit trail)

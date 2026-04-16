@@ -17,6 +17,7 @@ COLLECTIONS = {
     "research": "Research findings from agents — market data, competitor analysis",
     "product_specs": "Product specifications, game design docs, feature lists",
     "project_context": "Active project briefs, status updates, blockers",
+    "personal_research": "Rob's off-business deep-research findings (populated via /deep)",
 }
 
 

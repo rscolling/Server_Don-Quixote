@@ -79,7 +79,7 @@ async def view_thread(message_id: int) -> str:
 
 @tool
 def remember(collection: str, doc_id: str, text: str, metadata_json: str = "{}") -> str:
-    """Store something in shared memory. Collections: brand_voice, decisions, research, product_specs, project_context."""
+    """Store something in shared memory. Collections: brand_voice, decisions, research, product_specs, project_context, personal_research."""
     metadata = json.loads(metadata_json)
     metadata["stored_by"] = "BOB"
     metadata["stored_at"] = datetime.now(timezone.utc).isoformat()
@@ -89,7 +89,7 @@ def remember(collection: str, doc_id: str, text: str, metadata_json: str = "{}")
 
 @tool
 def recall(collection: str, query: str, n_results: int = 5) -> str:
-    """Search shared memory for relevant information. Collections: brand_voice, decisions, research, product_specs, project_context."""
+    """Search shared memory for relevant information. Collections: brand_voice, decisions, research, product_specs, project_context, personal_research."""
     results = memory.query(collection, query, n_results)
     return json.dumps(results)
 
@@ -365,7 +365,7 @@ async def check_voice_usage() -> str:
 def propose_memory(collection: str, doc_id: str, text: str,
                    proposed_by: str = "", reason: str = "",
                    metadata_json: str = "{}") -> str:
-    """Propose a write to shared memory for BOB's review. Agent teams should use this instead of remember() for important shared knowledge. Collections: brand_voice, decisions, research, product_specs, project_context."""
+    """Propose a write to shared memory for BOB's review. Agent teams should use this instead of remember() for important shared knowledge. Collections: brand_voice, decisions, research, product_specs, project_context, personal_research."""
     from app.memory_proposals import propose
     metadata = json.loads(metadata_json)
     result = propose(

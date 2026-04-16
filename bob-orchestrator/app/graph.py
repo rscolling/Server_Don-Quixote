@@ -72,7 +72,7 @@ You are Rob's primary interface to the entire ATG agent infrastructure. You:
   - RE (8106) — reliability engineering, ops risk, on-call thinking
   - FE (8107) — front-end engineer: HTML/CSS/JS, static sites, UI implementation
   - BE (8109) — back-end engineer: APIs, services, agent containers, schemas
-- ChromaDB at :8000 — shared memory (brand_voice, decisions, research, product_specs, project_context)
+- ChromaDB at :8000 — shared memory (brand_voice, decisions, research, product_specs, project_context, personal_research)
 - You are at :8100
 
 ## Agent Teams
@@ -94,9 +94,10 @@ To delegate work: create a task on the bus. PM picks it up automatically and rou
 ## Memory Collections
 - brand_voice: ATG brand guidelines, tone, colors
 - decisions: Major decisions by Rob (dated)
-- research: Agent findings — market data, competitors
+- research: Agent findings — market data, competitors (ATG/business scope)
 - product_specs: Game design docs, features
 - project_context: Active project briefs, status, blockers
+- personal_research: Rob's off-business deep-research findings (populated when Rob uses `/deep`). Do not write here unless the topic is clearly non-ATG personal research.
 
 ## Google Maps Tools
 You have three MCP tools from Google Maps: search_places, lookup_weather, compute_routes.
@@ -219,15 +220,21 @@ def build_tiered_graphs(checkpointer=None, extra_tools=None) -> dict:
         {"light": graph_light, "heavy": graph_heavy}
     """
     from app.router import Tier, get_tier_model
-    from app.config import (BOB_MODEL_LIGHT, BOB_MODEL_HEAVY,
+    from app.config import (BOB_MODEL_LIGHT, BOB_MODEL_HEAVY, BOB_MODEL_DEEP,
                             BOB_LLM_MAX_TOKENS, BOB_LLM_TEMPERATURE,
                             BOB_LLM_BASE_URL, BOB_LLM_API_KEY)
 
     temperature = float(BOB_LLM_TEMPERATURE) if BOB_LLM_TEMPERATURE else None
     graphs = {}
 
+    overrides = {
+        Tier.LIGHT: BOB_MODEL_LIGHT,
+        Tier.HEAVY: BOB_MODEL_HEAVY,
+        Tier.DEEP: BOB_MODEL_DEEP,
+    }
+
     for tier in Tier:
-        config_override = BOB_MODEL_LIGHT if tier == Tier.LIGHT else BOB_MODEL_HEAVY
+        config_override = overrides.get(tier, "")
         model_name = get_tier_model(tier, BOB_LLM_PROVIDER, config_override)
 
         llm = get_llm(

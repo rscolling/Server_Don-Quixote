@@ -20,6 +20,7 @@ logger = logging.getLogger("bob.router")
 class Tier(str, Enum):
     LIGHT = "light"
     HEAVY = "heavy"
+    DEEP = "deep"  # Opus-backed research mode. Opt-in only via `/deep` prefix — see main.py chat handler.
 
 
 @dataclass
@@ -41,6 +42,11 @@ TIER_DEFAULTS = {
         "anthropic": "claude-sonnet-4-20250514",
         "openai": "gpt-4o",
         "ollama": "qwen2.5:32b",
+    },
+    "deep": {
+        "anthropic": "claude-opus-4-6",
+        "openai": "gpt-4",
+        "ollama": "qwen2.5:72b",
     },
 }
 

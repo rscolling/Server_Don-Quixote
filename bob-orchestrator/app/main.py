@@ -380,19 +380,62 @@ async def chat(req: ChatRequest, request: Request):
     # ── Route to the right tier ──────────────────────────────────────────
     tier_used = None
     model_used = None
+    _stripped_msg = req.message.lstrip()
+    deep_mode = (
+        _stripped_msg.lower().startswith("/deep")
+        and (len(_stripped_msg) == len("/deep") or _stripped_msg[len("/deep")].isspace())
+    )
+
+    if deep_mode:
+        # Strip the prefix so Opus doesn't see it as content to interpret
+        req.message = _stripped_msg[len("/deep"):].lstrip()
+        if not req.message:
+            raise HTTPException(
+                status_code=400,
+                detail="/deep requires a question after the prefix (e.g. '/deep explain thermohaline currents').",
+            )
 
     if _tiered_graphs:
         from app.router import classify, get_tier_model, Tier
-        from app.config import BOB_LLM_PROVIDER, BOB_LLM_API_KEY, BOB_MODEL_LIGHT, BOB_MODEL_HEAVY
+        from app.config import (BOB_LLM_PROVIDER, BOB_LLM_API_KEY,
+                                BOB_MODEL_LIGHT, BOB_MODEL_HEAVY, BOB_MODEL_DEEP)
 
-        decision = await classify(req.message, BOB_LLM_PROVIDER, BOB_LLM_API_KEY)
-        tier_used = decision.tier.value
-        model_used = get_tier_model(
-            decision.tier, BOB_LLM_PROVIDER,
-            BOB_MODEL_LIGHT if decision.tier == Tier.LIGHT else BOB_MODEL_HEAVY,
-        )
-        graph = _tiered_graphs[tier_used]
-        logger.info(f"[{thread_id}] Routed to {tier_used} ({model_used}): {decision.reason}")
+        if deep_mode and Tier.DEEP.value in _tiered_graphs:
+            from app.cost_tracker import check_opus_budget
+            opus_status = check_opus_budget()
+            if not opus_status["allowed"]:
+                raise HTTPException(
+                    status_code=429,
+                    detail=f"Opus budget guard: {opus_status['reason']}",
+                    headers={
+                        "X-Opus-Daily-Spend": str(opus_status["daily_spend"]),
+                        "X-Opus-Daily-Budget": str(opus_status["daily_budget"]),
+                    },
+                )
+            if opus_status["alert_threshold_hit"]:
+                # Fire-and-forget; don't block the request. Topic convention
+                # matches the existing monitors (see _ntfy_send default topic).
+                asyncio.create_task(_ntfy_send(
+                    os.getenv("NTFY_TOPIC_COST", "bob-cost"),
+                    "Opus budget 80%+",
+                    f"Today: ${opus_status['daily_spend']:.2f} / ${opus_status['daily_budget']:.2f} "
+                    f"({int(opus_status['fraction'] * 100)}%)",
+                    priority="default",
+                ))
+
+            tier_used = Tier.DEEP.value
+            model_used = get_tier_model(Tier.DEEP, BOB_LLM_PROVIDER, BOB_MODEL_DEEP)
+            graph = _tiered_graphs[tier_used]
+            logger.info(f"[{thread_id}] /deep → {tier_used} ({model_used})")
+        else:
+            decision = await classify(req.message, BOB_LLM_PROVIDER, BOB_LLM_API_KEY)
+            tier_used = decision.tier.value
+            model_used = get_tier_model(
+                decision.tier, BOB_LLM_PROVIDER,
+                BOB_MODEL_LIGHT if decision.tier == Tier.LIGHT else BOB_MODEL_HEAVY,
+            )
+            graph = _tiered_graphs[tier_used]
+            logger.info(f"[{thread_id}] Routed to {tier_used} ({model_used}): {decision.reason}")
     else:
         graph = _graph
 

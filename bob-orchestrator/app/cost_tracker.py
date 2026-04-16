@@ -203,6 +203,50 @@ def get_daily_spend(user: str | None = None) -> float:
         return 0.0
 
 
+def get_daily_spend_by_model_prefix(prefix: str) -> float:
+    """Total spend today for models whose name starts with `prefix` (e.g. 'claude-opus')."""
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    try:
+        with _db() as conn:
+            row = conn.execute(
+                "SELECT COALESCE(SUM(cost_usd), 0) FROM usage WHERE date = ? AND model LIKE ?",
+                (today, f"{prefix}%"),
+            ).fetchone()
+            return float(row[0]) if row else 0.0
+    except Exception as e:
+        logger.error(f"Failed to query daily spend by prefix {prefix!r}: {e}")
+        return 0.0
+
+
+def check_opus_budget() -> dict:
+    """Check today's Opus spend against DAILY_BUDGET_USD_OPUS.
+
+    Returns:
+        {allowed, reason, daily_spend, daily_budget, fraction, alert_threshold_hit}
+
+    `alert_threshold_hit` is True when spend has crossed OPUS_BUDGET_ALERT_FRACTION
+    of the cap — caller is responsible for ntfy'ing (once per day ideally).
+    """
+    from app.config import DAILY_BUDGET_USD_OPUS, OPUS_BUDGET_ALERT_FRACTION
+
+    spend = get_daily_spend_by_model_prefix("claude-opus")
+    cap = DAILY_BUDGET_USD_OPUS
+    fraction = (spend / cap) if cap > 0 else 0.0
+    allowed = cap <= 0 or spend < cap
+
+    return {
+        "allowed": allowed,
+        "reason": (
+            "" if allowed else
+            f"Daily Opus budget exceeded: ${spend:.4f} >= ${cap}. Resets at UTC midnight."
+        ),
+        "daily_spend": round(spend, 4),
+        "daily_budget": cap,
+        "fraction": round(fraction, 3),
+        "alert_threshold_hit": cap > 0 and fraction >= OPUS_BUDGET_ALERT_FRACTION,
+    }
+
+
 def get_monthly_spend() -> float:
     """Total spend in USD for the current calendar month."""
     month_prefix = datetime.now(timezone.utc).strftime("%Y-%m")

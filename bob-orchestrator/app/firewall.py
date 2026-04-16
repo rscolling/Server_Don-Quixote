@@ -76,6 +76,7 @@ TOOL_REGISTRY = {
     "upload_photo": RiskLevel.MEDIUM,
     "get_weather": RiskLevel.LOW,
     "search_web": RiskLevel.LOW,
+    "deep_research": RiskLevel.MEDIUM,  # Opus-backed. Loud-log because of cost (~5x Sonnet).
     # Promotion gate tools (added 2026-04-08)
     "list_pending_promotions": RiskLevel.LOW,
     "get_promotion_details": RiskLevel.LOW,
