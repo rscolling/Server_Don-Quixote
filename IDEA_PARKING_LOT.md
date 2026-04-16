@@ -279,6 +279,75 @@ For #1 — which fandom wiki is the best test bed (Dresden has strong structure;
 
 ---
 
+### IDEA — Recurring Agentic-AI Research & Daily Comparison Brief
+**Added:** 2026-04-16
+**Source:** Rob
+**Status:** Parked
+
+**The idea:**
+Stand up a recurring research and documentation pipeline that scans the agentic-AI landscape for "good ideas" — promising patterns, frameworks, papers, and reference implementations — and documents what it finds. Sources include GitHub (trending repos, releases, PRs in agent frameworks like LangGraph, CrewAI, AutoGen, OpenDevin, Swarm), Hugging Face (new agent-focused models, datasets, Spaces), arXiv/blog feeds, and curated lists. The pipeline runs daily via the existing scheduler, hands work to RA in the debate arena, and produces (a) a daily summary of what dropped in the last 24h, and (b) a comparison analysis that scores new ideas against what BOB already does, flagging anything worth a deeper look or a parking-lot entry of its own.
+
+**Why it might be worth doing:**
+The agentic-AI space moves faster than Rob can read by hand. A self-running scout means BOB stays current on patterns that could improve his own architecture (better routing, new memory schemes, novel critic loops) and on competitors / inspiration for the BOB-as-a-Service offering. Daily comparison framing — "how does this stack up against what we run today?" — converts raw firehose into actionable signal. Pairs with the RAG skill-building projects (the corpus this produces becomes a high-quality test bed) and the marketplace idea (it surfaces what tools already exist before we build duplicates).
+
+**What it would need:**
+Source list and fetchers (GitHub API for trending/releases, Hugging Face API for model+dataset feeds, arXiv RSS, a few hand-picked Substacks/blogs). RA tool additions or MCP servers for each source. A daily scheduled job in [bob-orchestrator/app/scheduler.py](bob-orchestrator/app/scheduler.py) that posts a research task to the bus. A `research` collection write proposal flow (already exists via `memory_proposals.py`) so high-signal findings land in shared memory. Output format: markdown daily brief delivered via ntfy + dashboard, plus a rolling "ideas worth stealing" doc. Eval rubric so the comparison analysis is consistent (scoring axes: novelty, fit with our stack, effort to adopt, risk).
+
+**Cadence:**
+Start **daily** during the discovery phase — high frequency is needed to map the landscape and surface recurring themes. Once major themes have stabilized and the daily brief is repeating itself rather than uncovering new signal, **back off to weekly** synthesis (with a daily quick-scan that only fires a brief if something genuinely new lands). BOB owns the call to step down cadence based on novelty rate.
+
+**Open questions:**
+What's the concrete trigger to step from daily to weekly — N consecutive days of "no new themes," or a manual call from Rob? Which sources are signal vs. noise (GitHub trending is noisy; arXiv agent-tagged papers are higher quality but slower)? Should this be a single RA task or a fanout (one agent per source, QA synthesizes)? How do we prevent the daily brief from becoming yet-another-newsletter Rob skims and ignores — what makes it actionable? Dedup strategy for ideas that resurface week after week. Token budget per day.
+
+**BOB notes:**
+*(none yet)*
+
+---
+
+### IDEA — Opus-Backed Deep Research Mode (Open-Scope)
+**Added:** 2026-04-16
+**Source:** Rob
+**Status:** Parked
+
+**The idea:**
+Give BOB (and/or RA) a "deep research" mode that escalates to **Claude Opus** for hard, open-ended questions and explicitly allows research outside the ATG/BOB business scope. Today's research path is tuned to business-relevant work (market data, competitor analysis, brand-voice content) and runs on Sonnet 4.5 with bounded debate rounds — fine for product work, too narrow for "I'm curious about X, dig into it for me." The new mode would expose a `deep_research` tool (or a `/research` chat verb) that switches the active model to Opus for the synthesis stage, removes the business-scope filter, lifts max-rounds and token budgets, and produces a long-form, citation-rich brief on whatever Rob asks — from "how do thermohaline currents actually work" to "give me a real history of the schism between RA and Hinayana Buddhism" to "compare three competing theories on dark matter."
+
+**Why it might be worth doing:**
+Rob uses BOB as a thinking partner, not just a business operator. Right now anything off-business has to be done by hand in Claude.ai or perplexity, which loses the integration with shared memory, the audit log, the personality, and the ability to spawn follow-up tasks. Adding an Opus-backed deep-research mode keeps that work inside the system — findings can land in a `personal_research` ChromaDB collection, get cited in future conversations, and benefit from the existing critic loop (QA challenging weak claims). Also pairs naturally with the recurring agentic-AI scout idea: that pipeline finds the topics, this mode lets Rob go deep on any of them.
+
+**What it would need:**
+Model-routing extension in [bob-orchestrator/app/router.py](bob-orchestrator/app/router.py) so a request can opt into Opus instead of Sonnet/Haiku (with explicit cost warning since Opus is ~5x Sonnet). New `deep_research` tool that bypasses the business-scope filter on RA, raises debate `max_rounds` and per-call token caps, and routes synthesis through Opus while critique stays on Sonnet (cheaper, equally good at finding holes). New `personal_research` Chroma collection with its own write-proposal flow — keeps off-business research from polluting `research` and `brand_voice`. Optional: a `/deep` chat prefix or a separate endpoint so the heavyweight path is opt-in. Cost guardrail (per-day Opus budget, ntfy alert when exceeded).
+
+**Open questions:**
+Should deep research be a tool BOB can call autonomously, or strictly opt-in via `/deep` to prevent surprise Opus bills? Does Opus-as-synthesizer + Sonnet-as-critic actually outperform Sonnet-only on long-form research, or are we paying for marginal gains? What's the right per-query and per-day Opus budget — $5? $20? Should output land in a separate Chroma collection (`personal_research`) or the existing `research` with a scope tag? How does this interact with the firewall risk levels — is `deep_research` MEDIUM (loud-log because of cost) or LOW? Citation discipline: do we require structured source URLs in every paragraph, or trust Opus to footnote naturally?
+
+**BOB notes:**
+*(none yet)*
+
+---
+
+### IDEA — GBrain as Project Knowledge Tier (alongside ChromaDB)
+**Added:** 2026-04-16
+**Source:** Rob
+**Status:** Parked
+
+**The idea:**
+Add [GBrain](https://github.com/garrytan/gbrain) as a sixth shared service on don-quixote — a structured knowledge base layer running alongside (not replacing) the existing five-collection ChromaDB. GBrain provides a "compiled intelligence" model: each entity gets a living **compiled-truth** page (rewritten as understanding evolves, with auto-snapshotted versions) plus an **append-only timeline** of evidence, all wired into a typed cross-reference graph (`references`, `related_to`, `depends_on`). Exposed to BOB and the debate arena via GBrain's 21-tool MCP server (`gbrain serve`). The boundary rule: ChromaDB stays for snippets that get injected into context (brand voice phrases, individual decisions, spec fragments); GBrain owns living documents that evolve as the team learns more (competitor profiles, technology assessments, ADRs, project knowledge). BOB remains sole writer to both systems; agents read freely and propose writes through BOB. This is the **project memory** tier from the Multi-Agent Design Playbook — accumulated, cross-referenced knowledge that compounds across tasks instead of resetting cold every time RA opens a research thread.
+
+**Why it might be worth doing:**
+ChromaDB is great at similarity search but has no structure *within* a topic. Three rounds of competitive research over two months land as disconnected vector fragments — there is no "what we know about Competitor X as of today." GBrain fixes that with compiled truth + timeline per entity, plus a typed link graph that lets agents traverse from a competitor page to the technology pages and people pages it references. Bonus: adopting GBrain accelerates the parked RAG roadmap — its built-in chunking strategies (recursive / semantic / LLM-guided) cover stage 1, and its hybrid tsvector + HNSW + RRF + 4-layer-dedup search covers most of stage 2, leaving only cross-encoder reranking and agentic decomposition to build on top. Resource cost is trivial (<500MB RAM, negligible CPU at current 0.12 load / 9% RAM headroom).
+
+**What it would need:**
+Six build steps: (1) `pgvector/pgvector:pg16` container — self-hosted Postgres, replaces GBrain's default Supabase, no host port binding. (2) GBrain container with Bun runtime + `gbrain init --url` + schema migration. (3) Wire GBrain into BOB's `mcp_servers.json` so its 21 tools appear in BOB's inventory; firewall classification — read tools (`query`, `get_page`, `search`, `get_links`, `traverse_graph`, `get_backlinks`, `get_tags`, `get_timeline`, `get_stats`, `get_health`) at MEDIUM, write tools (`put_page`, `delete_page`, `add_link`, `add_timeline_entry`, `tag`) elevated to HIGH for sole-writer discipline. (4) Expose read-only tools to RA (query GBrain *first* on every research task), CE/QA (`query` + `get_page` for content tasks), SE/RE (ADR access). (5) Seed pages — one per major competitor, key tech, architectural decision, active project — to prove the pattern. (6) New post-task hook: when a debate task hits `ACCEPTED`, BOB evaluates whether output deserves a `put_page` call to update or create the relevant compiled-truth page (rewriting truth, appending timeline, auto-snapshot of prior version). Dependencies: Bun runtime (new on the server), Postgres+pgvector container (~200MB image), OpenAI API key (`text-embedding-3-large` for embeddings — ~$4-5 initial, pennies ongoing — the only non-Anthropic API on the platform), Anthropic API (already in use, GBrain uses Haiku for multi-query expansion and LLM-guided chunking).
+
+**Open questions:**
+(1) **OpenAI dependency** — accept the philosophical break from the all-Anthropic stack for trivial cost, or wait for GBrain's pluggable engine interface to gain alternative embedding providers? (2) **Postgres sharing** — if the message bus eventually migrates from SQLite to Postgres, share this instance (simpler ops) or keep separate (better blast radius)? (3) **GBrain's SQLite engine** — designed but not built; if it ships, the Postgres dependency disappears and we align with the existing SQLite-based bus. Worth monitoring before committing to Postgres long-term. (4) **Write automation scope** — how aggressively does BOB auto-persist debate-arena outputs to GBrain? Spectrum runs from "only when Rob asks" to "evaluate every ACCEPTED task and persist relevant knowledge automatically." Start conservative, expand based on signal quality. (5) **What NOT to do** (reaffirm in the build plan): don't replace ChromaDB, don't grant agents direct write access, don't use Supabase, don't expose Postgres outside the Docker network, don't duplicate ChromaDB decisions in GBrain pages — cite them.
+
+**BOB notes:**
+Verification checklist when this gets activated: pgvector container healthy; GBrain container migrated and `gbrain stats` clean; `gbrain serve` reachable as MCP from BOB; tools appear with correct firewall risk levels (read=MEDIUM, write=HIGH); RA returns GBrain results during a research task; BOB can create/update a compiled-truth page and version history works; ≥5 seed pages with truth + timeline + cross-refs; `gbrain health` shows >90% embed coverage, 0 stale, 0 orphans; existing five ChromaDB collections untouched; existing services unaffected; Langfuse traces show GBrain MCP calls with cost/latency. Pairs directly with the parked **RAG Skill-Building Projects** entry — adopting GBrain converts those projects from "build from scratch" to "evaluate against a working implementation."
+
+---
+
 ## Idea Template
 
 Copy this block for each new idea:
