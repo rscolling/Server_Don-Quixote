@@ -592,10 +592,95 @@ async def replay_recent_endpoint(tool: str = "", limit: int = 10,
 @app.get("/personality/status")
 async def personality_status_endpoint():
     """Show which personality variant BOB is using and what other variants
-    are available. Set BOB_PERSONALITY env var and restart to switch.
+    are available.
     """
     from app.personality import status
     return status()
+
+
+async def switch_personality_impl(name: str, source: str = "http") -> dict:
+    """Switch BOB's personality at runtime. Shared by the HTTP endpoint and
+    the switch_personality tool — single path, single audit trail.
+
+    Returns a result dict. Caller translates status='not_found' to an HTTP
+    404 if appropriate.
+
+    source: 'http' or 'tool' — recorded in the audit log so we can tell
+    which entry point triggered the switch.
+    """
+    global _graph, _tiered_graphs
+    from app.personality import (
+        set_active_personality,
+        get_active_personality_name,
+        list_available_personalities,
+    )
+    from app.config import BOB_ROUTING_ENABLED
+    from app.firewall import write_audit
+
+    if not set_active_personality(name):
+        available = [p["name"] for p in list_available_personalities()]
+        write_audit(
+            "personality_switch_not_found",
+            "switch_personality",
+            "medium",
+            details={"requested": name, "source": source, "available": available},
+        )
+        return {"status": "not_found", "requested": name, "available": available}
+
+    try:
+        from app.mcp_client import get_loaded_tools
+        mcp_tools = get_loaded_tools() if MCP_CLIENT_ENABLED else []
+
+        if BOB_ROUTING_ENABLED and _tiered_graphs:
+            existing_graph = list(_tiered_graphs.values())[0]
+            checkpointer = getattr(existing_graph, "checkpointer", None)
+            _tiered_graphs = build_tiered_graphs(checkpointer=checkpointer, extra_tools=mcp_tools)
+            _graph = _tiered_graphs["heavy"]
+        elif _graph:
+            checkpointer = getattr(_graph, "checkpointer", None)
+            _graph = build_graph(checkpointer=checkpointer, extra_tools=mcp_tools)
+
+        active = get_active_personality_name()
+        logger.info(f"Personality switched to '{active}' — graphs rebuilt (source={source})")
+        write_audit(
+            "personality_switch",
+            "switch_personality",
+            "medium",
+            details={"new_personality": active, "source": source, "graphs_rebuilt": True},
+        )
+        return {"status": "switched", "personality": active, "graphs_rebuilt": True}
+    except Exception as e:
+        active = get_active_personality_name()
+        logger.error(f"Failed to rebuild graphs after personality switch: {e}")
+        write_audit(
+            "personality_switch_rebuild_failed",
+            "switch_personality",
+            "medium",
+            details={"new_personality": active, "source": source, "error": str(e)},
+        )
+        return {
+            "status": "partial",
+            "personality": active,
+            "graphs_rebuilt": False,
+            "error": str(e),
+            "note": "Personality file loaded but graphs failed to rebuild. Restart BOB to apply.",
+        }
+
+
+@app.post("/personality/switch/{name}")
+async def personality_switch(name: str):
+    """Switch BOB's personality at runtime. Rebuilds the agent graphs with
+    the new personality loaded into the system prompt.
+
+    Available personalities can be found via GET /personality/status.
+    """
+    result = await switch_personality_impl(name, source="http")
+    if result.get("status") == "not_found":
+        raise HTTPException(
+            status_code=404,
+            detail=f"Personality '{name}' not found. Available: {result['available']}",
+        )
+    return result
 
 
 # ── Memory export / import endpoints ───────────────────────────────────────

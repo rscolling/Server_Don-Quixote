@@ -257,6 +257,28 @@ Does the Unity Personal license allow headless batch builds, or is a Pro/Build S
 
 ---
 
+### IDEA — RAG Skill-Building Projects (3-part progression)
+**Added:** 2026-04-14
+**Source:** Rob
+**Status:** Parked
+
+**The idea:**
+Three sequential projects on don-quixote to level up Rob's RAG skills, each targeting a different gap in the current BOB + ChromaDB stack. (1) **Fandom-wiki ingester with chunking strategy bake-off** — scrape the Dresden Files fandom wiki (or any fandom) and load it into 4 separate Chroma collections using different chunking strategies: fixed-size, recursive character, semantic embedding-similarity splits, and markdown-header-aware. Add a `/rag-eval` endpoint to BOB that runs ~20 canned questions against each collection and scores retrieval quality. (2) **Hybrid search + reranking on BOB's existing memory** — augment BOB's current pure-vector `memory.query()` with BM25 keyword search (via `rank_bm25`), fuse the two result lists using Reciprocal Rank Fusion, then apply a cross-encoder reranker (`bge-reranker-base` via sentence-transformers, or Cohere Rerank API) on top-20 before returning top-5. (3) **Agentic RAG with query decomposition + self-critique** — new `deep_research` tool on BOB where Haiku decomposes a complex query into sub-questions, retrieves per sub-question, Sonnet synthesizes, then self-critiques ("what's unsupported by the retrieved context?") and re-retrieves for gaps. Every step logged to Langfuse, evaluated against a held-out Q&A set. Recommended order: #1 → #2 → #3.
+
+**Why it might be worth doing:**
+BOB's current RAG setup uses default Chroma embeddings with basic top-k vector search — fine for MVP, but leaves a lot of answer quality on the table. Each project fixes a known failure mode: #1 teaches why chunking drives 80% of RAG quality, #2 addresses exact-match queries that pure vector search misses (error codes, proper nouns, specific terms), and #3 unlocks multi-hop questions that require synthesis across documents. Skills learned translate directly to the BOB-as-a-Service offering — paying customers will expect production-grade retrieval, not demo-grade.
+
+**What it would need:**
+Project #1: scraper (Python + requests/BeautifulSoup), semantic-split library (e.g., `semchunk` or custom), eval harness with scored Q&A pairs, ~1 day. Project #2: `rank_bm25` pip install, sentence-transformers or Cohere API key, RRF implementation (~30 lines), refactor of `memory.query()`, ~1 day. Project #3: new LangGraph sub-graph for decomposition → retrieve → synthesize → critique loop, Langfuse instrumentation (already running at :3000), held-out eval set, ~2-3 days. Total: roughly a long weekend of focused work.
+
+**Open questions:**
+For #1 — which fandom wiki is the best test bed (Dresden has strong structure; consider Wheel of Time or Malazan for comparison)? For #2 — Cohere Rerank costs per query vs. local `bge-reranker` latency on don-quixote hardware? For #3 — how many decomposition/critique iterations before we're in diminishing-returns territory? Should results from these experiments feed back into production BOB memory, or stay in a sandboxed collection?
+
+**BOB notes:**
+*(none yet)*
+
+---
+
 ## Idea Template
 
 Copy this block for each new idea:

@@ -28,6 +28,7 @@ logger = logging.getLogger("bob.personality")
 
 
 PERSONALITY_NAME = os.getenv("BOB_PERSONALITY", "sardonic").lower().strip()
+_active_personality = PERSONALITY_NAME  # mutable — can be changed at runtime
 PERSONALITIES_DIR = os.getenv(
     "BOB_PERSONALITIES_DIR",
     "/app/bob_context/personalities",
@@ -44,21 +45,38 @@ editorialize after if needed.
 """
 
 
+def set_active_personality(name: str) -> bool:
+    """Switch the active personality at runtime. Returns True if the file exists."""
+    global _active_personality
+    candidate = Path(PERSONALITIES_DIR) / f"{name.lower().strip()}.md"
+    if candidate.exists():
+        _active_personality = name.lower().strip()
+        logger.info(f"Active personality switched to '{_active_personality}'")
+        return True
+    logger.warning(f"Personality '{name}' not found at {candidate}")
+    return False
+
+
+def get_active_personality_name() -> str:
+    """Return the name of the currently active personality."""
+    return _active_personality
+
+
 def get_personality_text() -> tuple[str, str]:
     """Load the active personality file. Returns (name_used, text).
 
     Resolution order:
-    1. {PERSONALITIES_DIR}/{PERSONALITY_NAME}.md
+    1. {PERSONALITIES_DIR}/{_active_personality}.md
     2. /app/bob_context/00_personality.md (legacy default location)
     3. The hardcoded FALLBACK_PERSONALITY constant above
     """
     # Step 1: try the configured personalities directory
-    candidate = Path(PERSONALITIES_DIR) / f"{PERSONALITY_NAME}.md"
+    candidate = Path(PERSONALITIES_DIR) / f"{_active_personality}.md"
     if candidate.exists():
         try:
             text = candidate.read_text(encoding="utf-8")
-            logger.info(f"Loaded personality '{PERSONALITY_NAME}' from {candidate}")
-            return PERSONALITY_NAME, text
+            logger.info(f"Loaded personality '{_active_personality}' from {candidate}")
+            return _active_personality, text
         except Exception as e:
             logger.warning(f"Failed to read personality file {candidate}: {e}")
 
@@ -74,7 +92,7 @@ def get_personality_text() -> tuple[str, str]:
 
     # Step 3: hardcoded fallback
     logger.warning(
-        f"No personality file found for '{PERSONALITY_NAME}' "
+        f"No personality file found for '{_active_personality}' "
         f"(checked {PERSONALITIES_DIR} and legacy location). Using fallback."
     )
     return "fallback", FALLBACK_PERSONALITY
@@ -106,7 +124,7 @@ def list_available_personalities() -> list[dict]:
                     "path": str(path),
                     "size_bytes": path.stat().st_size,
                     "preview": preview,
-                    "active": path.stem == PERSONALITY_NAME,
+                    "active": path.stem == _active_personality,
                 })
             except Exception as e:
                 logger.warning(f"Failed to read personality {path}: {e}")
@@ -119,7 +137,7 @@ def status() -> dict:
     """Return personality status for the /health and /personality endpoints."""
     name, text = get_personality_text()
     return {
-        "active": PERSONALITY_NAME,
+        "active": _active_personality,
         "loaded_from": name,
         "personalities_dir": PERSONALITIES_DIR,
         "loaded_size_bytes": len(text.encode("utf-8")),

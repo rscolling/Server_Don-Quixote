@@ -785,6 +785,23 @@ async def reject_promotion(promotion_id: int, note: str = "") -> str:
     return json.dumps(data)
 
 
+@tool
+async def switch_personality(name: str) -> str:
+    """Switch BOB's personality at runtime. Rebuilds the agent with the new
+    personality. Available personalities: sardonic, redneck, neutral, terse.
+    Use GET /personality/status to see all available options.
+
+    This takes effect on the NEXT message — the current response still uses
+    the old personality.
+    """
+    from app.main import switch_personality_impl
+    try:
+        result = await switch_personality_impl(name, source="tool")
+        return json.dumps(result)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
 # All tools BOB has access to — wrapped with firewall gate
 _TOOLS = [
     create_task,
@@ -829,6 +846,7 @@ _TOOLS = [
     get_promotion_diff,
     approve_promotion,
     reject_promotion,
+    switch_personality,
 ]
 
 ALL_TOOLS = [_firewall_wrap(t) for t in _TOOLS + [check_confirmation]]
