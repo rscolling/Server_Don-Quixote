@@ -348,6 +348,28 @@ Verification checklist when this gets activated: pgvector container healthy; GBr
 
 ---
 
+### IDEA — Postgres + pgvector as Unified Data Platform (and a survey of other Postgres extensions)
+**Added:** 2026-04-16
+**Source:** Rob
+**Status:** Parked
+
+**The idea:**
+Stand up a single self-hosted Postgres (likely `pgvector/pgvector:pg16`) on don-quixote as a candidate replacement for — or peer to — ChromaDB, with **pgvector** handling vector similarity search (HNSW + IVFFlat indexes). Beyond vectors, run a structured review of other Postgres extensions to see which ones would genuinely pay rent in this project: **tsvector/tsquery** (built-in lexical full-text search, pairs with pgvector for hybrid BM25-style retrieval), **pg_trgm** (fuzzy/trigram matching — useful for near-miss exact matches like "Bear Creek Trail" vs. "Bear-Creek Trail"), **pg_cron** (cron-in-database — could simplify or replace `scheduler.py` / APScheduler patterns), **pgcrypto** (HMAC primitives for the already-parked tamper-evident audit log), **pg_stat_statements** (per-query observability, useful when tracing hot paths via Langfuse), **pg_partman** (partition management — keeps the audit log and cost_tracker tables healthy as they grow), **timescaledb** (time-series hypertables — natural fit for audit log, cost_tracker, message-bus state transitions), and **pg_jsonschema** (validate JSON payloads at the DB boundary so agents can't silently write malformed metadata). The goal isn't "use every extension" — it's to decide which one or two give meaningful leverage per unit of ops complexity before we accidentally commit to the stack via GBrain.
+
+**Why it might be worth doing:**
+The platform is drifting toward Postgres regardless: GBrain (R2 in the approved sequence) already requires a pgvector container, and the message bus is a candidate to eventually migrate off SQLite when write contention becomes an issue. Standing up Postgres *now* with pgvector + tsvector + pg_trgm would (1) let GBrain share the instance instead of its own silo, (2) unlock native hybrid search (pgvector + tsvector + RRF) — which covers most of the parked **RAG Skill-Building Projects** roadmap for free, (3) offer a smoother path for the message bus migration when the day comes, and (4) give the audit log and cost_tracker a home that supports partitioning, HMAC, and per-query metrics out of the box. Deciding this consciously — rather than letting GBrain or a future migration make the choice implicitly — means we pick the right extensions up front and avoid running two Postgres instances for no good reason.
+
+**What it would need:**
+Small survey first (~half-day): for each extension above, classify as **adopt-now** (clear win for an already-scheduled build), **adopt-when** (wait for the specific trigger that motivates it — e.g. audit log >10GB → `pg_partman`), or **skip** (pgroonga, niche stuff). Then a tiny build: `pgvector/pgvector:pg16` container on the `agent-net` Docker network with no host port binding, `CREATE EXTENSION` for the adopt-now set, health-check wiring into BOB's `/status` endpoint. Footprint: ~200MB image, <500MB RAM at rest. The harder open question is whether to *migrate ChromaDB into pgvector* or keep ChromaDB and use pgvector as a second vector surface for GBrain only — that's a weeks-scale project, not days, and probably belongs in a separate parking-lot entry once the survey results are in.
+
+**Open questions:**
+(1) **ChromaDB coexistence vs. migration** — ChromaDB has ~6 collections of real seed data today; does migrating to pgvector deliver enough value to justify a cutover, or should pgvector live alongside ChromaDB (ChromaDB for BOB's brand/decisions/etc., pgvector for GBrain + personal_research)? (2) **Shared instance with GBrain?** — if GBrain (R2) ships first with its own pgvector container, does this idea just absorb that container, or are they separate? (3) **Hybrid search payoff** — does tsvector + pgvector + RRF actually beat ChromaDB-default on our research_quality eval, or are we over-investing? R3's eval harness can answer this concretely once it's in place. (4) **pg_cron vs. APScheduler** — real migration or scope creep? pg_cron is attractive but the scheduler is already working; replacing it is only worth it if we get other wins from the extension (e.g. triggering jobs on DB state change). (5) **Embedding provider** — GBrain's plan assumes OpenAI `text-embedding-3-large`; if pgvector becomes the unified surface, does the rest of the platform follow suit (philosophical break from all-Anthropic), or do we host a local embedding model (llama.cpp / nomic-embed) to keep it Anthropic-plus-local? (6) **Blast radius** — if we consolidate everything into one Postgres, a single container failure takes out vector search, audit log, AND scheduled jobs; is that acceptable given the existing circuit-breaker + recovery infrastructure?
+
+**BOB notes:**
+*(none yet)*
+
+---
+
 ## Idea Template
 
 Copy this block for each new idea:
