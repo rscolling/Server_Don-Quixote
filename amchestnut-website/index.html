@@ -1711,10 +1711,62 @@
     }
   });
 
-  document.getElementById('modalConfirm').addEventListener('click', () => {
+  // ── EMAIL NOTIFICATIONS (Web3Forms + mailto fallback) ──
+  // Paste your Web3Forms access key here (get one free at https://web3forms.com).
+  // Until set, both flows fall back to opening the user's email client with
+  // the form contents prefilled to hello@amchestnut.io.
+  const WEB3FORMS_KEY = '';                      // ← replace with access_key from web3forms.com
+  const FALLBACK_EMAIL = 'hello@amchestnut.io';  // mailto: target when Web3Forms is unavailable
+
+  async function sendForm(subject, fields) {
+    const body = Object.entries(fields)
+      .filter(([, v]) => v && String(v).trim())
+      .map(([k, v]) => `${k}: ${v}`)
+      .join('\n');
+
+    if (WEB3FORMS_KEY) {
+      try {
+        const payload = {
+          access_key: WEB3FORMS_KEY,
+          subject,
+          from_name: 'American Chestnut Labs Website',
+          ...fields,
+        };
+        const resp = await fetch('https://api.web3forms.com/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (resp.ok) return { ok: true, via: 'web3forms' };
+        console.warn('Web3Forms non-ok:', resp.status);
+      } catch (err) {
+        console.warn('Web3Forms submit failed:', err);
+      }
+    }
+
+    // Fallback: mailto: with prefilled subject + body
+    const mailto = `mailto:${FALLBACK_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.location.href = mailto;
+    return { ok: true, via: 'mailto' };
+  }
+
+  document.getElementById('modalConfirm').addEventListener('click', async () => {
     const name = document.getElementById('modalName').value.trim();
     const email = document.getElementById('modalEmail').value.trim();
+    const company = document.getElementById('modalCompany').value.trim();
     if (!name || !email) { alert('Please enter your name and email.'); return; }
+
+    const btn = document.getElementById('modalConfirm');
+    btn.disabled = true;
+    btn.textContent = 'Sending…';
+
+    const result = await sendForm(`Booking request: ${name} — ${selectedDate} at ${selectedTime}`, {
+      name, email, company,
+      requested_date: selectedDate,
+      requested_time: selectedTime,
+      type: 'discovery_call_booking',
+    });
+
     document.getElementById('bookingModal').innerHTML = `
       <div style="text-align:center;padding:2rem;">
         <div style="font-size:3rem;margin-bottom:1rem;">✦</div>
@@ -1726,13 +1778,25 @@
   });
 
   // Contact form
-  document.getElementById('contactSubmit').addEventListener('click', () => {
+  document.getElementById('contactSubmit').addEventListener('click', async () => {
     const name = document.getElementById('contactName').value.trim();
     const email = document.getElementById('contactEmail').value.trim();
+    const company = document.getElementById('contactCompany').value.trim();
+    const service = document.getElementById('contactService').value;
+    const message = document.getElementById('contactMessage').value.trim();
     if (!name || !email) { alert('Please enter your name and email.'); return; }
-    document.getElementById('contactSubmit').textContent = '✦ Message sent — we\'ll be in touch';
-    document.getElementById('contactSubmit').style.background = '#4A5C3A';
-    document.getElementById('contactSubmit').disabled = true;
+
+    const btn = document.getElementById('contactSubmit');
+    btn.disabled = true;
+    btn.textContent = 'Sending…';
+
+    await sendForm(`Contact form: ${name}${service ? ' — ' + service : ''}`, {
+      name, email, company, service, message,
+      type: 'contact_form',
+    });
+
+    btn.textContent = '✦ Message sent — we\'ll be in touch';
+    btn.style.background = '#4A5C3A';
   });
 
   // ── SCROLL ANIMATIONS ──
