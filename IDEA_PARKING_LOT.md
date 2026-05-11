@@ -370,6 +370,30 @@ Small survey first (~half-day): for each extension above, classify as **adopt-no
 
 ---
 
+### IDEA — Real scheduling integration for amchestnut.io (Cal.com or Google Calendar)
+**Added:** 2026-04-17
+**Source:** Rob
+**Status:** Parked
+
+**The idea:**
+Replace the mockup calendar widget on amchestnut.io's schedule section with a real booking flow that checks Rob's actual Google Calendar availability, lets a visitor pick a free slot, and creates a confirmed calendar event with a video link and reminder emails. Today the widget is purely cosmetic — hardcoded time slots (9:00 AM, 9:15 AM, …, 3:30 PM), weekends greyed out, no availability check — and the "Confirm Booking" button just emails Rob the requested date/time so he can manually create the event. Two paths to fix this: (1) embed Cal.com (free self-hostable or free SaaS tier) into the schedule section as an iframe or inline component, OR (2) build a small FastAPI service on don-quixote that uses the existing Google Calendar MCP integration to read free/busy and write events, replacing only the JS handler behind the existing custom widget.
+
+**Why it might be worth doing:**
+Manual booking back-and-forth is the highest-friction point in the AmChestnut Labs sales flow. Every "Pick a Time → Rob gets email → Rob picks a slot → Rob emails back → user accepts" round trip loses prospects, especially the "I want to talk to someone right now" segment that drives consulting conversions. Real availability + auto-confirm closes the loop in one click and adds the event to both calendars without Rob touching anything. Pairs naturally with BOB's existing Gmail + Google Calendar MCP integration — the booking flow could even ntfy Rob and create a lead entry in a future `leads` ChromaDB collection as a side effect, giving BOB visibility into the sales funnel.
+
+**What it would need:**
+**Path A (Cal.com embed) — half day:** sign up for Cal.com free tier, connect Google Calendar, create an "AmChestnut Discovery Call" event type (15 min, video meeting, Mon-Fri 9am-noon + 2-4pm CT), grab the embed snippet, replace the custom calendar widget block in `amchestnut-website/index.html` (lines ~1447-1487) with the embed. Branding still feels native because Cal.com supports color theming and custom CSS. Trade-off: Cal.com hosts the booking page; visitor briefly leaves the iframe sandbox.
+**Path B (self-hosted via existing Calendar MCP) — 2 days:** new FastAPI service in `bob-orchestrator/` (or a sibling container) exposing two endpoints — `GET /availability?date=YYYY-MM-DD` (returns free 15-min slots from Rob's calendar via the existing `mcp__claude_ai_Google_Calendar__list_events` / `suggest_time` MCP tools) and `POST /book` (creates the event via `mcp__claude_ai_Google_Calendar__create_event`, sends confirmation to both parties). Wire the existing widget's JS to these endpoints. Self-hosted, no third-party dependency, but more code to maintain and route via cloudflared or nginx. Better data ownership.
+Either path also wants a parallel improvement: the booking confirmation should attach to a `leads` ChromaDB collection so BOB can summarize "calls scheduled this week" in the daily briefing.
+
+**Open questions:**
+(1) **Path A vs. Path B** — is Cal.com's branded-but-clearly-Cal.com booking page acceptable for a consulting site, or does the friction of "wait this isn't the same site" hurt conversion enough to justify the 2-day self-build? (2) **Calendar account** — book straight into `robert.colling@gmail.com`, or set up a dedicated `bookings@amchestnut.io` Google account so the inbox of confirmations doesn't drown personal mail? (3) **Slot policy** — Mon-Fri 9-noon + 2-4pm CT is a reasonable default; should this be configurable per-week, or is "set it and forget it" fine? (4) **Buffer time** — 15-min slots back-to-back, or 5-min buffer between calls? (5) **Reschedule / cancel UX** — Cal.com handles this natively (booking includes magic-link to reschedule); Path B would need to build a separate reschedule endpoint. Worth it, or do we just say "email rob@amchestnut.io to reschedule" until volume justifies more? (6) **BOB integration depth** — should booking-confirmed events trigger a BOB tool call to research the company in the meeting description (LinkedIn, Crunchbase) and prep a briefing for Rob 1 hour before the call?
+
+**BOB notes:**
+*(none yet)*
+
+---
+
 ## Idea Template
 
 Copy this block for each new idea:
