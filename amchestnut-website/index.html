@@ -1,0 +1,1752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>American Chestnut Labs | AI Solutions for Growing Businesses</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Lora:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bark: #3B2A1A;
+    --chestnut: #7B4A2D;
+    --amber: #C4792A;
+    --gold: #E8A94A;
+    --cream: #F5EDD8;
+    --parchment: #EDE0C4;
+    --moss: #4A5C3A;
+    --sage: #7A8C6A;
+    --mist: #B8C4A8;
+    --white: #FDFAF4;
+    --shadow: rgba(59,42,26,0.15);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--white);
+    color: var(--bark);
+    font-family: 'DM Sans', sans-serif;
+    overflow-x: hidden;
+  }
+
+  /* ── NAV ── */
+  nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.2rem 4rem;
+    background: rgba(253,250,244,0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--parchment);
+  }
+
+  .nav-logo {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--bark);
+    text-decoration: none;
+    letter-spacing: -0.02em;
+  }
+
+  .nav-logo span { color: var(--amber); }
+
+  .nav-links {
+    display: flex;
+    gap: 2.5rem;
+    list-style: none;
+    align-items: center;
+  }
+
+  .nav-links a {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--chestnut);
+    text-decoration: none;
+    letter-spacing: 0.03em;
+    transition: color 0.2s;
+  }
+
+  .nav-links a:hover { color: var(--amber); }
+
+  .nav-cta {
+    background: var(--chestnut);
+    color: var(--cream) !important;
+    padding: 0.6rem 1.4rem;
+    border-radius: 2px;
+    transition: background 0.2s !important;
+  }
+
+  .nav-cta:hover { background: var(--amber) !important; color: var(--white) !important; }
+
+  /* ── HERO ── */
+  .hero {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero-left {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 8rem 4rem 6rem 5rem;
+    position: relative;
+    z-index: 2;
+  }
+
+  .hero-eyebrow {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 1.5rem;
+  }
+
+  .hero-title {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(2.8rem, 4vw, 4.2rem);
+    font-weight: 900;
+    line-height: 1.1;
+    color: var(--bark);
+    margin-bottom: 1.8rem;
+  }
+
+  .hero-title em {
+    font-style: italic;
+    color: var(--chestnut);
+  }
+
+  .hero-subtitle {
+    font-family: 'Lora', serif;
+    font-size: 1.15rem;
+    line-height: 1.8;
+    color: var(--chestnut);
+    max-width: 480px;
+    margin-bottom: 3rem;
+  }
+
+  .hero-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .btn-primary {
+    background: var(--chestnut);
+    color: var(--cream);
+    padding: 1rem 2rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    transition: background 0.25s, transform 0.15s;
+    letter-spacing: 0.02em;
+  }
+
+  .btn-primary:hover {
+    background: var(--amber);
+    transform: translateY(-2px);
+  }
+
+  .btn-secondary {
+    color: var(--chestnut);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 500;
+    text-decoration: none;
+    border-bottom: 2px solid var(--gold);
+    padding-bottom: 2px;
+    transition: color 0.2s, border-color 0.2s;
+  }
+
+  .btn-secondary:hover { color: var(--amber); border-color: var(--amber); }
+
+  .hero-right {
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* SVG Hero Art - Appalachian Mountain Scene */
+  .hero-art {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .hero-badge {
+    position: absolute;
+    bottom: 3rem;
+    left: -2rem;
+    background: var(--cream);
+    border: 1px solid var(--parchment);
+    padding: 1.2rem 1.8rem;
+    box-shadow: 0 8px 32px var(--shadow);
+    z-index: 3;
+  }
+
+  .hero-badge-num {
+    font-family: 'Playfair Display', serif;
+    font-size: 2rem;
+    font-weight: 900;
+    color: var(--amber);
+    display: block;
+  }
+
+  .hero-badge-label {
+    font-size: 0.8rem;
+    color: var(--chestnut);
+    font-weight: 500;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── MARQUEE ── */
+  .marquee-bar {
+    background: var(--bark);
+    padding: 0.9rem 0;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .marquee-track {
+    display: inline-block;
+    animation: marquee 30s linear infinite;
+  }
+
+  .marquee-track span {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 500;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--gold);
+    padding: 0 3rem;
+  }
+
+  .marquee-track span.dot {
+    color: var(--amber);
+    padding: 0;
+  }
+
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+
+  /* ── ABOUT ── */
+  .about {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    min-height: 60vh;
+  }
+
+  .about-art {
+    position: relative;
+    overflow: hidden;
+    min-height: 500px;
+  }
+
+  .about-content {
+    padding: 6rem 5rem 6rem 5rem;
+    background: var(--cream);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .section-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 1rem;
+  }
+
+  .section-title {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(2rem, 3vw, 3rem);
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--bark);
+    margin-bottom: 1.5rem;
+  }
+
+  .section-title em { font-style: italic; color: var(--chestnut); }
+
+  .section-body {
+    font-family: 'Lora', serif;
+    font-size: 1.05rem;
+    line-height: 1.85;
+    color: var(--chestnut);
+    margin-bottom: 2rem;
+  }
+
+  /* ── SERVICES ── */
+  .services {
+    padding: 7rem 5rem;
+    background: var(--white);
+  }
+
+  .services-header {
+    text-align: center;
+    max-width: 600px;
+    margin: 0 auto 4rem;
+  }
+
+  .services-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+    background: var(--parchment);
+  }
+
+  .service-card {
+    background: var(--white);
+    padding: 3rem 2.5rem;
+    position: relative;
+    overflow: hidden;
+    transition: background 0.3s;
+    cursor: default;
+  }
+
+  .service-card::before {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--amber);
+    transform: scaleX(0);
+    transition: transform 0.3s;
+    transform-origin: left;
+  }
+
+  .service-card:hover { background: var(--cream); }
+  .service-card:hover::before { transform: scaleX(1); }
+
+  .service-icon {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 1.5rem;
+  }
+
+  .service-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--bark);
+    margin-bottom: 0.8rem;
+  }
+
+  .service-desc {
+    font-family: 'Lora', serif;
+    font-size: 0.95rem;
+    line-height: 1.75;
+    color: var(--chestnut);
+    margin-bottom: 1.5rem;
+  }
+
+  .service-tag {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--amber);
+    border: 1px solid var(--gold);
+    padding: 0.25rem 0.6rem;
+    margin: 0.2rem 0.2rem 0.2rem 0;
+  }
+
+  /* ── RETAINER TIERS ── */
+  .tiers {
+    padding: 7rem 5rem;
+    background: var(--bark);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .tiers::before {
+    content: '';
+    position: absolute;
+    top: -100px; right: -100px;
+    width: 500px; height: 500px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(196,121,42,0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .tiers-header {
+    text-align: center;
+    max-width: 600px;
+    margin: 0 auto 4rem;
+  }
+
+  .tiers-header .section-label { color: var(--gold); }
+  .tiers-header .section-title { color: var(--cream); }
+  .tiers-header .section-body { color: var(--mist); }
+
+  .tiers-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .tier-card {
+    background: rgba(245,237,216,0.06);
+    border: 1px solid rgba(232,169,74,0.2);
+    padding: 2.5rem 2rem;
+    position: relative;
+    transition: border-color 0.3s, background 0.3s;
+  }
+
+  .tier-card:hover {
+    border-color: rgba(232,169,74,0.5);
+    background: rgba(245,237,216,0.1);
+  }
+
+  .tier-card.featured {
+    border-color: var(--amber);
+    background: rgba(196,121,42,0.1);
+  }
+
+  .tier-badge {
+    position: absolute;
+    top: -12px; left: 50%;
+    transform: translateX(-50%);
+    background: var(--amber);
+    color: var(--cream);
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.25rem 0.8rem;
+    white-space: nowrap;
+  }
+
+  .tier-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--cream);
+    margin-bottom: 0.5rem;
+  }
+
+  .tier-tagline {
+    font-size: 0.85rem;
+    color: var(--mist);
+    margin-bottom: 2rem;
+    font-style: italic;
+  }
+
+  .tier-features {
+    list-style: none;
+    margin-bottom: 2rem;
+  }
+
+  .tier-features li {
+    font-size: 0.9rem;
+    color: var(--parchment);
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+  }
+
+  .tier-features li::before {
+    content: '✦';
+    color: var(--gold);
+    font-size: 0.65rem;
+    flex-shrink: 0;
+  }
+
+  .tier-cta {
+    display: block;
+    text-align: center;
+    background: transparent;
+    border: 1px solid var(--gold);
+    color: var(--gold);
+    padding: 0.9rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.25s, color 0.25s;
+    letter-spacing: 0.05em;
+  }
+
+  .tier-cta:hover, .tier-card.featured .tier-cta {
+    background: var(--amber);
+    border-color: var(--amber);
+    color: var(--white);
+  }
+
+  .tier-cta:hover { background: var(--chestnut); border-color: var(--chestnut); }
+  .tier-card.featured .tier-cta:hover { background: var(--gold); border-color: var(--gold); }
+
+  /* ── TESTIMONIAL ── */
+  .testimonials {
+    padding: 7rem 5rem;
+    background: var(--parchment);
+  }
+
+  .testimonials-header {
+    text-align: center;
+    max-width: 600px;
+    margin: 0 auto 4rem;
+  }
+
+  .testimonial-card {
+    max-width: 860px;
+    margin: 0 auto;
+    background: var(--white);
+    padding: 4rem;
+    position: relative;
+    box-shadow: 0 4px 40px var(--shadow);
+  }
+
+  .testimonial-card::before {
+    content: '\201C';
+    font-family: 'Playfair Display', serif;
+    font-size: 8rem;
+    color: var(--gold);
+    opacity: 0.3;
+    position: absolute;
+    top: 1rem; left: 2rem;
+    line-height: 1;
+  }
+
+  .testimonial-text {
+    font-family: 'Lora', serif;
+    font-size: 1.2rem;
+    line-height: 1.85;
+    color: var(--bark);
+    font-style: italic;
+    position: relative;
+    z-index: 1;
+    margin-bottom: 2rem;
+  }
+
+  .testimonial-author {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .author-avatar {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: var(--chestnut);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Playfair Display', serif;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--cream);
+    flex-shrink: 0;
+  }
+
+  .author-info strong {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--bark);
+    display: block;
+  }
+
+  .author-info span {
+    font-size: 0.85rem;
+    color: var(--sage);
+  }
+
+  /* ── SCHEDULE ── */
+  .schedule {
+    padding: 7rem 5rem;
+    background: var(--cream);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5rem;
+    align-items: center;
+  }
+
+  .schedule-content .section-body {
+    margin-bottom: 1.5rem;
+  }
+
+  .schedule-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 2.5rem;
+  }
+
+  .schedule-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: 0.9rem;
+    color: var(--chestnut);
+  }
+
+  .schedule-meta-icon {
+    width: 36px;
+    height: 36px;
+    background: var(--amber);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: var(--white);
+    font-size: 1rem;
+  }
+
+  /* Calendar Widget */
+  .calendar-widget {
+    background: var(--white);
+    border: 1px solid var(--parchment);
+    padding: 2rem;
+    box-shadow: 0 4px 24px var(--shadow);
+  }
+
+  .cal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+  }
+
+  .cal-month {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--bark);
+  }
+
+  .cal-nav {
+    background: none;
+    border: 1px solid var(--parchment);
+    width: 32px; height: 32px;
+    cursor: pointer;
+    color: var(--chestnut);
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+  }
+
+  .cal-nav:hover { background: var(--cream); }
+
+  .cal-days-header {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    text-align: center;
+    margin-bottom: 0.5rem;
+  }
+
+  .cal-days-header span {
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--sage);
+    padding: 0.3rem 0;
+  }
+
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    margin-bottom: 1.5rem;
+  }
+
+  .cal-day {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    color: var(--bark);
+    cursor: pointer;
+    border-radius: 2px;
+    transition: background 0.15s, color 0.15s;
+    position: relative;
+  }
+
+  .cal-day:hover:not(.empty):not(.past) { background: var(--parchment); }
+  .cal-day.available { font-weight: 500; }
+  .cal-day.available::after {
+    content: '';
+    position: absolute;
+    bottom: 4px; left: 50%;
+    transform: translateX(-50%);
+    width: 4px; height: 4px;
+    border-radius: 50%;
+    background: var(--amber);
+  }
+  .cal-day.selected {
+    background: var(--chestnut) !important;
+    color: var(--cream) !important;
+  }
+  .cal-day.selected::after { background: var(--cream); }
+  .cal-day.past { color: var(--mist); cursor: default; }
+  .cal-day.empty { cursor: default; }
+  .cal-day.today {
+    background: var(--parchment);
+    font-weight: 700;
+  }
+
+  .cal-times {
+    display: none;
+  }
+
+  .cal-times.active {
+    display: block;
+  }
+
+  .cal-times-title {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--chestnut);
+    margin-bottom: 0.75rem;
+  }
+
+  .cal-time-slots {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin-bottom: 1.5rem;
+  }
+
+  .time-slot {
+    border: 1px solid var(--parchment);
+    padding: 0.5rem;
+    text-align: center;
+    font-size: 0.78rem;
+    font-weight: 500;
+    cursor: pointer;
+    color: var(--chestnut);
+    transition: all 0.15s;
+  }
+
+  .time-slot:hover { border-color: var(--amber); color: var(--amber); }
+  .time-slot.selected { background: var(--amber); border-color: var(--amber); color: var(--white); }
+
+  .cal-book-btn {
+    width: 100%;
+    background: var(--chestnut);
+    color: var(--cream);
+    border: none;
+    padding: 0.9rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+    display: none;
+  }
+
+  .cal-book-btn.active { display: block; }
+  .cal-book-btn:hover { background: var(--amber); }
+
+  /* ── CONTACT ── */
+  .contact {
+    padding: 7rem 5rem;
+    background: var(--white);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5rem;
+  }
+
+  .contact-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .form-group label {
+    font-size: 0.78rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--chestnut);
+  }
+
+  .form-group input,
+  .form-group textarea,
+  .form-group select {
+    border: 1px solid var(--parchment);
+    padding: 0.8rem 1rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem;
+    color: var(--bark);
+    background: var(--white);
+    outline: none;
+    transition: border-color 0.2s;
+    resize: vertical;
+  }
+
+  .form-group input:focus,
+  .form-group textarea:focus,
+  .form-group select:focus { border-color: var(--amber); }
+
+  .contact-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2rem;
+  }
+
+  .contact-info-item {
+    display: flex;
+    gap: 1.2rem;
+    align-items: flex-start;
+  }
+
+  .contact-info-icon {
+    width: 40px; height: 40px;
+    background: var(--cream);
+    border: 1px solid var(--parchment);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 1.1rem;
+  }
+
+  .contact-info-item strong {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--chestnut);
+    display: block;
+    margin-bottom: 0.2rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .contact-info-item a, .contact-info-item p {
+    font-family: 'Lora', serif;
+    font-size: 1rem;
+    color: var(--bark);
+    text-decoration: none;
+  }
+
+  .contact-info-item a:hover { color: var(--amber); }
+
+  /* ── FOOTER ── */
+  footer {
+    background: var(--bark);
+    color: var(--mist);
+    padding: 3rem 5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  .footer-logo {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--cream);
+  }
+
+  .footer-logo span { color: var(--gold); }
+
+  footer p {
+    font-size: 0.85rem;
+    color: var(--sage);
+  }
+
+  .footer-links {
+    display: flex;
+    gap: 2rem;
+    list-style: none;
+  }
+
+  .footer-links a {
+    font-size: 0.85rem;
+    color: var(--mist);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+
+  .footer-links a:hover { color: var(--gold); }
+
+  /* ── MODAL ── */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(59,42,26,0.7);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+  }
+
+  .modal-overlay.active { display: flex; }
+
+  .modal {
+    background: var(--white);
+    max-width: 480px;
+    width: 90%;
+    padding: 3rem;
+    position: relative;
+    animation: fadeUp 0.3s ease;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .modal-close {
+    position: absolute;
+    top: 1rem; right: 1rem;
+    background: none;
+    border: none;
+    font-size: 1.3rem;
+    cursor: pointer;
+    color: var(--chestnut);
+    line-height: 1;
+  }
+
+  .modal h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.6rem;
+    color: var(--bark);
+    margin-bottom: 0.5rem;
+  }
+
+  .modal p {
+    font-family: 'Lora', serif;
+    font-size: 0.95rem;
+    color: var(--chestnut);
+    margin-bottom: 1.5rem;
+  }
+
+  .modal-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .modal-form input {
+    border: 1px solid var(--parchment);
+    padding: 0.75rem 1rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .modal-form input:focus { border-color: var(--amber); }
+
+  .modal-confirm {
+    background: var(--chestnut);
+    color: var(--cream);
+    border: none;
+    padding: 0.9rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .modal-confirm:hover { background: var(--amber); }
+
+  /* ── ANIMATIONS ── */
+  .fade-in {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+  }
+
+  .fade-in.visible {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 900px) {
+    nav { padding: 1rem 2rem; }
+    .nav-links { display: none; }
+    .hero { grid-template-columns: 1fr; }
+    .hero-right { height: 300px; }
+    .hero-left { padding: 7rem 2rem 3rem; }
+    .about, .schedule, .contact { grid-template-columns: 1fr; }
+    .about-art { min-height: 280px; }
+    .services { padding: 4rem 2rem; }
+    .services-grid, .tiers-grid { grid-template-columns: 1fr; }
+    .tiers, .testimonials, .schedule, .contact { padding: 4rem 2rem; }
+    footer { flex-direction: column; text-align: center; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="#" class="nav-logo">American Chestnut <span>Labs</span></a>
+  <ul class="nav-links">
+    <li><a href="#about">About</a></li>
+    <li><a href="#services">Services</a></li>
+    <li><a href="#retainers">Retainers</a></li>
+    <li><a href="#testimonials">Clients</a></li>
+    <li><a href="#contact">Contact</a></li>
+    <li><a href="#schedule" class="nav-cta">Schedule a Call</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-left">
+    <div class="hero-eyebrow">AI Solutions · amchestnut.io</div>
+    <h1 class="hero-title">
+      Deep roots.<br>
+      <em>Modern intelligence.</em>
+    </h1>
+    <p class="hero-subtitle">
+      We build agentic AI systems and modernize legacy infrastructure for mid-market businesses ready to grow without starting over.
+    </p>
+    <div class="hero-actions">
+      <a href="#schedule" class="btn-primary">Schedule a Discovery Call</a>
+      <a href="#services" class="btn-secondary">See our services →</a>
+    </div>
+  </div>
+  <div class="hero-right">
+    <!-- Appalachian Mountain SVG Art -->
+    <svg viewBox="0 0 720 800" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;display:block;">
+      <defs>
+        <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#E8C99A"/>
+          <stop offset="60%" stop-color="#D4A574"/>
+          <stop offset="100%" stop-color="#B8834A"/>
+        </linearGradient>
+        <linearGradient id="mtn1" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#4A5C3A"/>
+          <stop offset="100%" stop-color="#2E3D24"/>
+        </linearGradient>
+        <linearGradient id="mtn2" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#5C7048"/>
+          <stop offset="100%" stop-color="#3A4D2E"/>
+        </linearGradient>
+        <linearGradient id="mtn3" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#7A8C6A"/>
+          <stop offset="100%" stop-color="#4A5C3A"/>
+        </linearGradient>
+        <linearGradient id="fogGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#F5EDD8" stop-opacity="0.7"/>
+          <stop offset="100%" stop-color="#F5EDD8" stop-opacity="0"/>
+        </linearGradient>
+        <filter id="blur1">
+          <feGaussianBlur stdDeviation="2"/>
+        </filter>
+        <filter id="blur2">
+          <feGaussianBlur stdDeviation="4"/>
+        </filter>
+      </defs>
+
+      <!-- Sky -->
+      <rect width="720" height="800" fill="url(#skyGrad)"/>
+
+      <!-- Sun -->
+      <circle cx="560" cy="160" r="70" fill="#F0C060" opacity="0.35" filter="url(#blur2)"/>
+      <circle cx="560" cy="160" r="45" fill="#F0C060" opacity="0.5" filter="url(#blur1)"/>
+      <circle cx="560" cy="160" r="28" fill="#F5D080" opacity="0.8"/>
+
+      <!-- Distant mountains - farthest -->
+      <path d="M0 500 Q90 340 180 380 Q270 320 360 360 Q450 300 540 340 Q630 280 720 320 L720 800 L0 800Z" fill="#B8C4A8" opacity="0.5" filter="url(#blur2)"/>
+
+      <!-- Mid mountains -->
+      <path d="M0 560 Q80 400 160 440 Q240 380 340 420 Q420 360 500 400 Q580 360 660 390 Q700 380 720 370 L720 800 L0 800Z" fill="url(#mtn3)" opacity="0.7"/>
+
+      <!-- Closer ridgeline -->
+      <path d="M0 600 Q60 480 120 510 Q200 450 280 490 Q360 440 440 480 Q500 450 580 470 Q640 455 720 445 L720 800 L0 800Z" fill="url(#mtn2)"/>
+
+      <!-- Foreground ridge -->
+      <path d="M0 680 Q100 600 200 630 Q300 580 380 620 Q460 590 540 615 Q620 595 720 610 L720 800 L0 800Z" fill="url(#mtn1)"/>
+
+      <!-- Trees silhouette on foreground -->
+      <g fill="#1E2A14" opacity="0.8">
+        <!-- Left cluster -->
+        <polygon points="40,680 55,640 70,680"/>
+        <polygon points="55,680 72,630 89,680"/>
+        <polygon points="75,682 90,648 105,682"/>
+        <polygon points="95,680 108,650 121,680"/>
+        <!-- Center cluster -->
+        <polygon points="280,620 295,582 310,620"/>
+        <polygon points="300,620 315,575 330,620"/>
+        <polygon points="320,622 333,588 346,622"/>
+        <!-- Right cluster -->
+        <polygon points="580,615 595,578 610,615"/>
+        <polygon points="600,614 614,572 628,614"/>
+        <polygon points="618,616 630,582 642,616"/>
+      </g>
+
+      <!-- Mist/fog layer -->
+      <ellipse cx="360" cy="580" rx="400" ry="60" fill="#F5EDD8" opacity="0.25"/>
+      <ellipse cx="200" cy="630" rx="280" ry="40" fill="#F5EDD8" opacity="0.2"/>
+
+      <!-- Circuit/tech overlay - subtle AI reference -->
+      <g opacity="0.12" stroke="#E8A94A" stroke-width="1" fill="none">
+        <line x1="60" y1="200" x2="160" y2="200"/>
+        <circle cx="60" cy="200" r="3" fill="#E8A94A"/>
+        <circle cx="160" cy="200" r="3" fill="#E8A94A"/>
+        <line x1="160" y1="200" x2="160" y2="240"/>
+        <line x1="160" y1="240" x2="220" y2="240"/>
+        <circle cx="220" cy="240" r="3" fill="#E8A94A"/>
+        <line x1="100" y1="160" x2="100" y2="200"/>
+        <circle cx="100" cy="160" r="3" fill="#E8A94A"/>
+        <line x1="60" y1="200" x2="60" y2="260"/>
+        <line x1="60" y1="260" x2="120" y2="260"/>
+        <circle cx="120" cy="260" r="5" fill="none" stroke="#E8A94A"/>
+      </g>
+
+      <!-- Chestnut leaf decorative element -->
+      <g transform="translate(580,80)" opacity="0.6">
+        <ellipse cx="0" cy="0" rx="22" ry="8" fill="#4A5C3A" transform="rotate(-30)"/>
+        <ellipse cx="0" cy="0" rx="22" ry="8" fill="#4A5C3A" transform="rotate(10)"/>
+        <ellipse cx="0" cy="0" rx="22" ry="8" fill="#5C7048" transform="rotate(50)"/>
+        <line x1="-20" y1="15" x2="0" y2="-5" stroke="#3B2A1A" stroke-width="1.5"/>
+      </g>
+    </svg>
+
+    <!-- Badge -->
+    <div class="hero-badge">
+      <span class="hero-badge-num">15 min</span>
+      <span class="hero-badge-label">Free Discovery Call</span>
+    </div>
+  </div>
+</section>
+
+<!-- MARQUEE -->
+<div class="marquee-bar" aria-hidden="true">
+  <div class="marquee-track">
+    <span>Legacy Modernization</span><span class="dot">✦</span>
+    <span>Agentic AI Workflows</span><span class="dot">✦</span>
+    <span>COBOL Migration</span><span class="dot">✦</span>
+    <span>RAG Pipelines</span><span class="dot">✦</span>
+    <span>Mid-Market AI</span><span class="dot">✦</span>
+    <span>Data Engineering</span><span class="dot">✦</span>
+    <span>Process Automation</span><span class="dot">✦</span>
+    <!-- duplicate for seamless loop -->
+    <span>Legacy Modernization</span><span class="dot">✦</span>
+    <span>Agentic AI Workflows</span><span class="dot">✦</span>
+    <span>COBOL Migration</span><span class="dot">✦</span>
+    <span>RAG Pipelines</span><span class="dot">✦</span>
+    <span>Mid-Market AI</span><span class="dot">✦</span>
+    <span>Data Engineering</span><span class="dot">✦</span>
+    <span>Process Automation</span><span class="dot">✦</span>
+  </div>
+</div>
+
+<!-- ABOUT -->
+<section class="about" id="about">
+  <div class="about-art">
+    <svg viewBox="0 0 600 700" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;display:block;">
+      <defs>
+        <linearGradient id="woodGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#7B4A2D"/>
+          <stop offset="100%" stop-color="#3B2A1A"/>
+        </linearGradient>
+      </defs>
+      <!-- Background -->
+      <rect width="600" height="700" fill="#EDE0C4"/>
+
+      <!-- Abstract Chestnut tree / growth metaphor -->
+      <!-- Root system (legacy/foundation) -->
+      <g stroke="#7B4A2D" stroke-width="2.5" fill="none" opacity="0.5">
+        <path d="M300 600 Q260 580 230 620"/>
+        <path d="M300 600 Q280 590 260 640"/>
+        <path d="M300 600 Q320 580 350 620"/>
+        <path d="M300 600 Q330 590 360 640"/>
+        <path d="M300 600 Q300 620 300 660"/>
+        <path d="M230 620 Q210 640 190 660"/>
+        <path d="M350 620 Q370 640 390 660"/>
+      </g>
+
+      <!-- Trunk -->
+      <path d="M285 600 Q278 480 270 350 Q265 280 280 200" stroke="#5C3520" stroke-width="18" fill="none" stroke-linecap="round"/>
+      <path d="M315 600 Q322 480 330 350 Q335 280 320 200" stroke="#7B4A2D" stroke-width="14" fill="none" stroke-linecap="round"/>
+
+      <!-- Branches -->
+      <g stroke="#5C3520" stroke-width="6" fill="none" stroke-linecap="round">
+        <path d="M275 320 Q240 290 200 270"/>
+        <path d="M280 280 Q250 240 210 210"/>
+        <path d="M295 220 Q270 180 260 150"/>
+        <path d="M315 260 Q340 220 370 200"/>
+        <path d="M320 300 Q360 270 390 250"/>
+        <path d="M310 350 Q350 330 380 310"/>
+      </g>
+
+      <!-- Leaves clusters -->
+      <g fill="#4A5C3A" opacity="0.85">
+        <ellipse cx="195" cy="262" rx="28" ry="16" transform="rotate(-20,195,262)"/>
+        <ellipse cx="205" cy="205" rx="24" ry="14" transform="rotate(15,205,205)"/>
+        <ellipse cx="258" cy="142" rx="26" ry="15" transform="rotate(-10,258,142)"/>
+        <ellipse cx="372" cy="193" rx="25" ry="14" transform="rotate(25,372,193)"/>
+        <ellipse cx="392" cy="243" rx="22" ry="12" transform="rotate(-15,392,243)"/>
+        <ellipse cx="382" cy="303" rx="24" ry="13" transform="rotate(10,382,303)"/>
+      </g>
+      <g fill="#5C7048" opacity="0.6">
+        <ellipse cx="185" cy="255" rx="20" ry="10" transform="rotate(10,185,255)"/>
+        <ellipse cx="215" cy="198" rx="18" ry="9" transform="rotate(-25,215,198)"/>
+        <ellipse cx="268" cy="138" rx="19" ry="10" transform="rotate(20,268,138)"/>
+        <ellipse cx="362" cy="190" rx="20" ry="11" transform="rotate(-20,362,190)"/>
+      </g>
+
+      <!-- Chestnuts -->
+      <g fill="#C4792A">
+        <circle cx="192" cy="272" r="7"/>
+        <circle cx="210" cy="268" r="6"/>
+        <circle cx="263" cy="152" r="7"/>
+        <circle cx="367" cy="203" r="6"/>
+        <circle cx="378" cy="315" r="7"/>
+      </g>
+
+      <!-- Data/circuit nodes growing from branches - AI metaphor -->
+      <g opacity="0.3">
+        <circle cx="195" cy="255" r="10" fill="none" stroke="#E8A94A" stroke-width="1.5"/>
+        <circle cx="260" cy="145" r="10" fill="none" stroke="#E8A94A" stroke-width="1.5"/>
+        <circle cx="372" cy="196" r="10" fill="none" stroke="#E8A94A" stroke-width="1.5"/>
+        <line x1="195" y1="245" x2="195" y2="220" stroke="#E8A94A" stroke-width="1"/>
+        <line x1="260" y1="135" x2="285" y2="110" stroke="#E8A94A" stroke-width="1"/>
+        <line x1="372" y1="186" x2="380" y2="160" stroke="#E8A94A" stroke-width="1"/>
+      </g>
+
+      <!-- Ground line -->
+      <line x1="0" y1="610" x2="600" y2="610" stroke="#C4A07A" stroke-width="1" opacity="0.4"/>
+
+      <!-- Small decorative text -->
+      <text x="40" y="680" font-family="serif" font-size="11" fill="#7B4A2D" opacity="0.5" font-style="italic">
+        "Strong roots. Smarter growth."
+      </text>
+    </svg>
+  </div>
+  <div class="about-content fade-in">
+    <div class="section-label">About American Chestnut Labs</div>
+    <h2 class="section-title">Built for businesses with <em>real roots</em></h2>
+    <p class="section-body">
+      The American chestnut once dominated the Eastern forests — resilient, productive, deeply established. Then it was lost. We named our practice after its comeback: the work of rebuilding something strong using modern science without losing what made it great in the first place.
+    </p>
+    <p class="section-body">
+      That's what we do for mid-market and small businesses. Your existing systems, workflows, and institutional knowledge are assets. We help you connect them to agentic AI — intelligently, without ripping everything out.
+    </p>
+    <a href="#schedule" class="btn-primary">Start with a free call</a>
+  </div>
+</section>
+
+<!-- SERVICES -->
+<section class="services" id="services">
+  <div class="services-header fade-in">
+    <div class="section-label">What We Do</div>
+    <h2 class="section-title">Services built for <em>your scale</em></h2>
+    <p class="section-body">From legacy data pipelines to autonomous AI agents — we meet your business where it is and build toward where it's going.</p>
+  </div>
+
+  <div class="services-grid">
+    <div class="service-card fade-in">
+      <svg class="service-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="4" y="8" width="40" height="32" rx="2" stroke="#C4792A" stroke-width="2"/>
+        <path d="M4 16h40M16 16v24" stroke="#C4792A" stroke-width="2"/>
+        <circle cx="10" cy="12" r="2" fill="#C4792A"/>
+        <circle cx="24" cy="30" r="4" fill="none" stroke="#7B4A2D" stroke-width="1.5"/>
+        <path d="M24 26v-4M28 30h4" stroke="#7B4A2D" stroke-width="1.5"/>
+      </svg>
+      <h3 class="service-name">Legacy System Modernization</h3>
+      <p class="service-desc">We wrap, migrate, or incrementally replace aging COBOL, mainframe, and on-prem systems — without burning down what's working.</p>
+      <span class="service-tag">COBOL</span>
+      <span class="service-tag">API Wrapping</span>
+      <span class="service-tag">CDC Replication</span>
+    </div>
+
+    <div class="service-card fade-in">
+      <svg class="service-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="24" cy="24" r="8" stroke="#C4792A" stroke-width="2"/>
+        <circle cx="8" cy="12" r="4" stroke="#7B4A2D" stroke-width="1.5"/>
+        <circle cx="40" cy="12" r="4" stroke="#7B4A2D" stroke-width="1.5"/>
+        <circle cx="8" cy="36" r="4" stroke="#7B4A2D" stroke-width="1.5"/>
+        <circle cx="40" cy="36" r="4" stroke="#7B4A2D" stroke-width="1.5"/>
+        <line x1="12" y1="14" x2="18" y2="19" stroke="#C4792A" stroke-width="1.5"/>
+        <line x1="36" y1="14" x2="30" y2="19" stroke="#C4792A" stroke-width="1.5"/>
+        <line x1="12" y1="34" x2="18" y2="29" stroke="#C4792A" stroke-width="1.5"/>
+        <line x1="36" y1="34" x2="30" y2="29" stroke="#C4792A" stroke-width="1.5"/>
+      </svg>
+      <h3 class="service-name">Agentic AI Workflow Design</h3>
+      <p class="service-desc">Multi-agent systems that automate complex business processes — with human-in-the-loop checkpoints where they matter most.</p>
+      <span class="service-tag">Claude API</span>
+      <span class="service-tag">Multi-Agent</span>
+      <span class="service-tag">Automation</span>
+    </div>
+
+    <div class="service-card fade-in">
+      <svg class="service-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="6" y="6" width="16" height="16" rx="1" stroke="#C4792A" stroke-width="2"/>
+        <rect x="26" y="6" width="16" height="16" rx="1" stroke="#7B4A2D" stroke-width="1.5"/>
+        <rect x="6" y="26" width="16" height="16" rx="1" stroke="#7B4A2D" stroke-width="1.5"/>
+        <rect x="26" y="26" width="16" height="16" rx="1" stroke="#C4792A" stroke-width="2"/>
+        <path d="M22 14h4M14 22v4M34 22v4M26 34h-4" stroke="#C4792A" stroke-width="1.5"/>
+      </svg>
+      <h3 class="service-name">RAG & Document Intelligence</h3>
+      <p class="service-desc">We connect your private document stores — SharePoint, file servers, PDFs — to retrieval-augmented AI that actually understands your business.</p>
+      <span class="service-tag">RAG Pipelines</span>
+      <span class="service-tag">SharePoint</span>
+      <span class="service-tag">Vector DB</span>
+    </div>
+
+    <div class="service-card fade-in">
+      <svg class="service-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M8 36L20 24l8 8 12-16" stroke="#C4792A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <rect x="4" y="4" width="40" height="40" rx="2" stroke="#7B4A2D" stroke-width="1.5"/>
+        <circle cx="20" cy="24" r="3" fill="#C4792A"/>
+        <circle cx="28" cy="32" r="3" fill="#C4792A"/>
+      </svg>
+      <h3 class="service-name">Data Engineering & Pipelines</h3>
+      <p class="service-desc">SQL and Python-backed data pipelines that move, transform, and serve your data reliably — the infrastructure AI needs to work well.</p>
+      <span class="service-tag">SQL</span>
+      <span class="service-tag">Python</span>
+      <span class="service-tag">ETL/ELT</span>
+    </div>
+
+    <div class="service-card fade-in">
+      <svg class="service-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M24 4L4 16v16l20 12 20-12V16L24 4z" stroke="#C4792A" stroke-width="2"/>
+        <path d="M4 16l20 12 20-12M24 28v16" stroke="#7B4A2D" stroke-width="1.5"/>
+        <circle cx="24" cy="24" r="4" fill="#C4792A" opacity="0.6"/>
+      </svg>
+      <h3 class="service-name">AI Fluency Training</h3>
+      <p class="service-desc">Workshops and corporate training that bring your teams up to speed on agentic AI — tailored for non-technical and technical staff alike.</p>
+      <span class="service-tag">Workshops</span>
+      <span class="service-tag">Corporate Training</span>
+      <span class="service-tag">Lean Six Sigma</span>
+    </div>
+
+    <div class="service-card fade-in">
+      <svg class="service-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="24" cy="20" r="10" stroke="#C4792A" stroke-width="2"/>
+        <path d="M14 40c0-5.523 4.477-10 10-10s10 4.477 10 10" stroke="#C4792A" stroke-width="2" stroke-linecap="round"/>
+        <path d="M34 12l6-4M34 28l6 4M14 12L8 8M14 28l-6 4" stroke="#7B4A2D" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <h3 class="service-name">Fractional AI Architect</h3>
+      <p class="service-desc">Need senior AI architecture guidance without a full-time hire? We embed on a retainer basis — strategy, implementation oversight, and execution.</p>
+      <span class="service-tag">Strategy</span>
+      <span class="service-tag">Retainer</span>
+      <span class="service-tag">Senior Advisory</span>
+    </div>
+  </div>
+</section>
+
+<!-- RETAINER TIERS -->
+<section class="tiers" id="retainers">
+  <div class="tiers-header fade-in">
+    <div class="section-label">Engagement Models</div>
+    <h2 class="section-title" style="color:var(--cream)">Choose your <em style="color:var(--gold)">depth</em></h2>
+    <p class="section-body" style="color:var(--mist)">All engagements begin with a free 15-minute discovery call. Pricing is discussed after we understand your needs.</p>
+  </div>
+
+  <div class="tiers-grid">
+    <div class="tier-card fade-in">
+      <div class="tier-name">Seedling</div>
+      <div class="tier-tagline">For businesses taking their first steps with AI</div>
+      <ul class="tier-features">
+        <li>Monthly strategy session (2 hrs)</li>
+        <li>AI readiness assessment</li>
+        <li>One workflow audit per month</li>
+        <li>Implementation roadmap</li>
+        <li>Email support</li>
+      </ul>
+      <a href="#schedule" class="tier-cta">Schedule a Call</a>
+    </div>
+
+    <div class="tier-card featured fade-in">
+      <div class="tier-badge">Most Popular</div>
+      <div class="tier-name">Canopy</div>
+      <div class="tier-tagline">Active implementation for growing teams</div>
+      <ul class="tier-features">
+        <li>Weekly working sessions (up to 8 hrs/mo)</li>
+        <li>Agentic workflow design & build</li>
+        <li>Data pipeline development</li>
+        <li>Legacy integration planning</li>
+        <li>Priority Slack/email support</li>
+        <li>Monthly progress reports</li>
+      </ul>
+      <a href="#schedule" class="tier-cta">Schedule a Call</a>
+    </div>
+
+    <div class="tier-card fade-in">
+      <div class="tier-name">Old Growth</div>
+      <div class="tier-tagline">Deep partnership for complex transformations</div>
+      <ul class="tier-features">
+        <li>Dedicated fractional architect (20+ hrs/mo)</li>
+        <li>Full-stack legacy modernization</li>
+        <li>Multi-agent system development</li>
+        <li>Team training & enablement</li>
+        <li>24/5 priority support</li>
+        <li>Quarterly business reviews</li>
+        <li>Custom AI fluency workshops</li>
+      </ul>
+      <a href="#schedule" class="tier-cta">Schedule a Call</a>
+    </div>
+  </div>
+</section>
+
+<!-- TESTIMONIALS -->
+<section class="testimonials" id="testimonials">
+  <div class="testimonials-header fade-in">
+    <div class="section-label">Client Stories</div>
+    <h2 class="section-title">What our partners say</h2>
+  </div>
+
+  <div class="testimonial-card fade-in">
+    <p class="testimonial-text">
+      "American Chestnut Labs helped us completely rethink how we were managing our product catalog and order workflows. What used to take our small team hours of manual data work each week is now handled by an agentic pipeline they built in about six weeks. The approach was thoughtful — they never pushed us toward more complexity than we needed, and they trained our team alongside the build. Genuinely one of the best investments we've made."
+    </p>
+    <div class="testimonial-author">
+      <div class="author-avatar">AT</div>
+      <div class="author-info">
+        <strong>Operations Director</strong>
+        <span>Appalachian Toys &amp; Games · Asheville, NC</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SCHEDULE -->
+<section class="schedule" id="schedule">
+  <div class="schedule-content fade-in">
+    <div class="section-label">Book a Call</div>
+    <h2 class="section-title">Let's talk about <em>your business</em></h2>
+    <p class="section-body">
+      A free 15-minute discovery call is the first step. We'll learn about your current systems, where you're feeling the friction, and whether there's a fit.
+    </p>
+    <div class="schedule-meta">
+      <div class="schedule-meta-item">
+        <div class="schedule-meta-icon">⏱</div>
+        <span>15-minute video or phone call</span>
+      </div>
+      <div class="schedule-meta-item">
+        <div class="schedule-meta-icon">🎯</div>
+        <span>No pitch, no pressure — just a real conversation</span>
+      </div>
+      <div class="schedule-meta-item">
+        <div class="schedule-meta-icon">📅</div>
+        <span>Slots available Monday through Friday</span>
+      </div>
+    </div>
+    <a href="#" class="btn-primary" id="scheduleBtn">Pick a Time</a>
+  </div>
+
+  <div class="calendar-widget fade-in" id="calendarWidget">
+    <div class="cal-header">
+      <button class="cal-nav" id="prevMonth">&#8249;</button>
+      <div class="cal-month" id="calMonth">May 2026</div>
+      <button class="cal-nav" id="nextMonth">&#8250;</button>
+    </div>
+    <div class="cal-days-header">
+      <span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+    <div class="cal-times" id="calTimes">
+      <div class="cal-times-title" id="calTimesTitle">Available times</div>
+      <div class="cal-time-slots" id="calTimeSlots"></div>
+    </div>
+    <button class="cal-book-btn" id="calBookBtn">Confirm Booking →</button>
+  </div>
+</section>
+
+<!-- CONTACT -->
+<section class="contact" id="contact">
+  <div class="fade-in">
+    <div class="section-label">Get in Touch</div>
+    <h2 class="section-title" style="margin-bottom:2rem">Send us a <em>message</em></h2>
+    <div class="contact-form">
+      <div class="form-group">
+        <label>Your Name</label>
+        <input type="text" placeholder="Jane Smith" id="contactName"/>
+      </div>
+      <div class="form-group">
+        <label>Email Address</label>
+        <input type="email" placeholder="jane@company.com" id="contactEmail"/>
+      </div>
+      <div class="form-group">
+        <label>Company</label>
+        <input type="text" placeholder="Acme Corp" id="contactCompany"/>
+      </div>
+      <div class="form-group">
+        <label>What are you looking to solve?</label>
+        <select id="contactService">
+          <option value="">Select a service area</option>
+          <option>Legacy System Modernization</option>
+          <option>Agentic AI Workflows</option>
+          <option>RAG / Document Intelligence</option>
+          <option>Data Engineering</option>
+          <option>AI Fluency Training</option>
+          <option>Fractional AI Architect</option>
+          <option>Not sure yet</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Message</label>
+        <textarea rows="4" placeholder="Tell us a bit about your situation..." id="contactMessage"></textarea>
+      </div>
+      <button class="btn-primary" id="contactSubmit" style="border:none;width:100%;cursor:pointer;font-family:inherit;">Send Message</button>
+    </div>
+  </div>
+
+  <div class="contact-info fade-in">
+    <div>
+      <div class="section-label">Contact Details</div>
+      <h2 class="section-title" style="font-size:1.8rem;margin-bottom:2rem">We'd love to <em>hear from you</em></h2>
+    </div>
+
+    <div class="contact-info-item">
+      <div class="contact-info-icon">🌐</div>
+      <div>
+        <strong>Website</strong>
+        <a href="https://amchestnut.io">amchestnut.io</a>
+      </div>
+    </div>
+
+    <div class="contact-info-item">
+      <div class="contact-info-icon">📍</div>
+      <div>
+        <strong>Location</strong>
+        <p>Asheville / Leicester, NC<br>Serving clients nationally · Remote-first</p>
+      </div>
+    </div>
+
+    <div class="contact-info-item">
+      <div class="contact-info-icon">🤝</div>
+      <div>
+        <strong>Specialization</strong>
+        <p>Agentic AI &amp; Legacy Modernization<br>7+ Years Data Engineering</p>
+      </div>
+    </div>
+
+    <!-- Social art card -->
+    <div style="margin-top:1rem;">
+      <svg viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;border:1px solid #EDE0C4;">
+        <rect width="400" height="200" fill="#3B2A1A"/>
+        <path d="M0 140 Q100 100 200 120 Q300 140 400 110 L400 200 L0 200Z" fill="#4A5C3A" opacity="0.6"/>
+        <path d="M0 160 Q120 130 240 150 Q320 160 400 140 L400 200 L0 200Z" fill="#2E3D24" opacity="0.8"/>
+        <circle cx="320" cy="60" r="35" fill="#E8A94A" opacity="0.2"/>
+        <circle cx="320" cy="60" r="20" fill="#E8A94A" opacity="0.3"/>
+        <text x="30" y="60" font-family="Georgia,serif" font-size="20" font-weight="bold" fill="#F5EDD8">American Chestnut Labs</text>
+        <text x="30" y="85" font-family="Georgia,serif" font-size="11" fill="#C4A07A" font-style="italic">AI Solutions for Growing Businesses</text>
+        <text x="30" y="115" font-family="sans-serif" font-size="10" fill="#7A8C6A" letter-spacing="2">amchestnut.io</text>
+        <g fill="#C4792A" opacity="0.7">
+          <polygon points="340,120 350,100 360,120"/>
+          <polygon points="355,122 364,104 373,122"/>
+          <polygon points="368,121 376,106 384,121"/>
+        </g>
+      </svg>
+      <p style="font-size:0.75rem;color:var(--sage);margin-top:0.5rem;font-style:italic;">Social media thumbnail — share-ready</p>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">American Chestnut <span>Labs</span></div>
+  <p>© 2026 American Chestnut Labs · amchestnut.io · Asheville, NC</p>
+  <ul class="footer-links">
+    <li><a href="#about">About</a></li>
+    <li><a href="#services">Services</a></li>
+    <li><a href="#schedule">Book a Call</a></li>
+    <li><a href="#contact">Contact</a></li>
+  </ul>
+</footer>
+
+<!-- BOOKING MODAL -->
+<div class="modal-overlay" id="bookingModal">
+  <div class="modal">
+    <button class="modal-close" id="modalClose">✕</button>
+    <h3>Confirm Your Booking</h3>
+    <p id="modalDesc">15-minute discovery call · American Chestnut Labs</p>
+    <div class="modal-form">
+      <input type="text" placeholder="Your full name" id="modalName"/>
+      <input type="email" placeholder="Your email address" id="modalEmail"/>
+      <input type="text" placeholder="Company (optional)" id="modalCompany"/>
+      <button class="modal-confirm" id="modalConfirm">Schedule My Call →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── CALENDAR ──
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const today = new Date();
+  let curYear = today.getFullYear();
+  let curMonth = today.getMonth();
+  let selectedDate = null;
+  let selectedTime = null;
+
+  const times = ['9:00 AM','9:15 AM','9:30 AM','9:45 AM','10:00 AM','10:15 AM','10:30 AM','10:45 AM','11:00 AM','2:00 PM','2:15 PM','2:30 PM','3:00 PM','3:15 PM','3:30 PM'];
+
+  function renderCal() {
+    document.getElementById('calMonth').textContent = `${months[curMonth]} ${curYear}`;
+    const grid = document.getElementById('calGrid');
+    grid.innerHTML = '';
+    const first = new Date(curYear, curMonth, 1).getDay();
+    const days = new Date(curYear, curMonth + 1, 0).getDate();
+
+    for (let i = 0; i < first; i++) {
+      const el = document.createElement('div');
+      el.className = 'cal-day empty';
+      grid.appendChild(el);
+    }
+
+    for (let d = 1; d <= days; d++) {
+      const el = document.createElement('div');
+      const date = new Date(curYear, curMonth, d);
+      const isPast = date < new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const isToday = d === today.getDate() && curMonth === today.getMonth() && curYear === today.getFullYear();
+      const dow = date.getDay();
+      const isWeekend = dow === 0 || dow === 6;
+
+      el.className = 'cal-day' + (isPast || isWeekend ? ' past' : ' available') + (isToday ? ' today' : '');
+      el.textContent = d;
+
+      if (!isPast && !isWeekend) {
+        el.addEventListener('click', () => selectDay(d, el));
+      }
+      grid.appendChild(el);
+    }
+  }
+
+  function selectDay(d, el) {
+    document.querySelectorAll('.cal-day').forEach(e => e.classList.remove('selected'));
+    el.classList.add('selected');
+    selectedDate = `${months[curMonth]} ${d}, ${curYear}`;
+    selectedTime = null;
+    document.querySelectorAll('.time-slot').forEach(e => e.classList.remove('selected'));
+    renderTimes();
+    document.getElementById('calBookBtn').classList.remove('active');
+  }
+
+  function renderTimes() {
+    const container = document.getElementById('calTimes');
+    const slots = document.getElementById('calTimeSlots');
+    document.getElementById('calTimesTitle').textContent = `Available times — ${selectedDate}`;
+    slots.innerHTML = '';
+    times.forEach(t => {
+      const el = document.createElement('div');
+      el.className = 'time-slot';
+      el.textContent = t;
+      el.addEventListener('click', () => {
+        document.querySelectorAll('.time-slot').forEach(e => e.classList.remove('selected'));
+        el.classList.add('selected');
+        selectedTime = t;
+        document.getElementById('calBookBtn').classList.add('active');
+      });
+      slots.appendChild(el);
+    });
+    container.classList.add('active');
+  }
+
+  document.getElementById('prevMonth').addEventListener('click', () => {
+    curMonth--;
+    if (curMonth < 0) { curMonth = 11; curYear--; }
+    selectedDate = null; selectedTime = null;
+    document.getElementById('calTimes').classList.remove('active');
+    document.getElementById('calBookBtn').classList.remove('active');
+    renderCal();
+  });
+
+  document.getElementById('nextMonth').addEventListener('click', () => {
+    curMonth++;
+    if (curMonth > 11) { curMonth = 0; curYear++; }
+    selectedDate = null; selectedTime = null;
+    document.getElementById('calTimes').classList.remove('active');
+    document.getElementById('calBookBtn').classList.remove('active');
+    renderCal();
+  });
+
+  document.getElementById('calBookBtn').addEventListener('click', () => {
+    if (!selectedDate || !selectedTime) return;
+    document.getElementById('modalDesc').textContent = `15-min discovery call · ${selectedDate} at ${selectedTime}`;
+    document.getElementById('bookingModal').classList.add('active');
+  });
+
+  // ── MODAL ──
+  document.getElementById('modalClose').addEventListener('click', () => {
+    document.getElementById('bookingModal').classList.remove('active');
+  });
+
+  document.getElementById('bookingModal').addEventListener('click', e => {
+    if (e.target === document.getElementById('bookingModal')) {
+      document.getElementById('bookingModal').classList.remove('active');
+    }
+  });
+
+  document.getElementById('modalConfirm').addEventListener('click', () => {
+    const name = document.getElementById('modalName').value.trim();
+    const email = document.getElementById('modalEmail').value.trim();
+    if (!name || !email) { alert('Please enter your name and email.'); return; }
+    document.getElementById('bookingModal').innerHTML = `
+      <div style="text-align:center;padding:2rem;">
+        <div style="font-size:3rem;margin-bottom:1rem;">✦</div>
+        <h3 style="font-family:'Playfair Display',serif;color:#3B2A1A;margin-bottom:0.5rem;">You're on the calendar</h3>
+        <p style="font-family:'Lora',serif;color:#7B4A2D;line-height:1.7;">${selectedDate} at ${selectedTime}<br>We'll send a confirmation to <strong>${email}</strong> shortly.</p>
+        <button onclick="document.getElementById('bookingModal').classList.remove('active')" style="margin-top:1.5rem;background:#7B4A2D;color:#F5EDD8;border:none;padding:0.8rem 2rem;font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer;">Done</button>
+      </div>
+    `;
+  });
+
+  // Contact form
+  document.getElementById('contactSubmit').addEventListener('click', () => {
+    const name = document.getElementById('contactName').value.trim();
+    const email = document.getElementById('contactEmail').value.trim();
+    if (!name || !email) { alert('Please enter your name and email.'); return; }
+    document.getElementById('contactSubmit').textContent = '✦ Message sent — we\'ll be in touch';
+    document.getElementById('contactSubmit').style.background = '#4A5C3A';
+    document.getElementById('contactSubmit').disabled = true;
+  });
+
+  // ── SCROLL ANIMATIONS ──
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) e.target.classList.add('visible');
+    });
+  }, { threshold: 0.1 });
+
+  document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+
+  // ── INIT ──
+  renderCal();
+</script>
+
+</body>
+</html>
